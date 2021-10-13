@@ -3,25 +3,30 @@
 #include <iostream>
 #include <sstream>
 #include <string_view>
+#include <vector>
 
 #include "base64.hpp"
+#include "judge/judge.hpp"
 
 //信息的传输格式
+namespace JUDGESEVER {
 
 //message decode status
 #define msg_dbg_out(one) std::cout << #one << ": " <<  one  << std::endl
 
-//接收的信息
-class message {
+//发送的信息
+class judgeMessage {
 public:
-    message() = default;
-    message(int time,int memory,int uid ,std::string_view lang,std::string_view code)
+    judgeMessage() = default;
+    judgeMessage(int time,int memory,int uid ,std::string_view lang,std::string_view code)
         :time{time},memory{memory},uid{uid},lang{lang},code{code}
     {}
 
     int         time;   //时间限制 ms
     int         memory; //内存限制 mb
+    int         pid;    //标识
     int         uid;    //标识
+    int         socket;
     std::string lang;
     std::string code;
 private:
@@ -42,7 +47,9 @@ public:
         ss << "lang " << lang << '\n';
         ss << "time " << time << '\n';
         ss << "memory " << memory << '\n';
+        ss << "pid " << pid << '\n';
         ss << "uid " << uid << '\n';
+        ss << "socket " << socket << '\n';
         ss << "code " << Base64::Encode(code.c_str(), code.size()) << '\n';
         ss << '\n';
         return ss.str();
@@ -77,11 +84,77 @@ public:
                     else if( key == "code") code = Base64::Decode(value.c_str(), value.size());
                     else if( key == "time") time = atoi(value.c_str());
                     else if( key == "uid")  uid = atoi(value.c_str());
+                    else if( key == "pid")  pid = atoi(value.c_str());
                     else if( key == "memory") memory = atoi(value.c_str());
+                    else if( key == "socket") socket = atoi(value.c_str());
                     status = MSGD_STATUS::new_line;
                 }
                 else value.push_back(c);
                 return false;
         }
+        return false;
     }
 };
+
+std::istream& operator>>(std::istream &__in,judge::result &res){
+    __in >> res.cpu_time 
+        >> res.real_time 
+        >> res.memory    
+        >> res.signal    
+        >> res.exit_code 
+        >> res.error     
+        >> res.result;
+    return __in;
+}
+std::ostream& operator<<(std::ostream &__on,judge::result &res){
+    __on << res.cpu_time << ' '
+        << res.real_time << ' '
+        << res.memory    << ' '
+        << res.signal    << ' '
+        << res.exit_code << ' '
+        << res.error     << ' '
+        << res.result << '\n';
+    return __on;
+}
+
+class resMessage {
+public:
+    int                        socket; //哪个socket需要写
+    judge::STATUS              status; // 评测的状态
+    std::vector<judge::result> results; //结果集
+
+    bool decode(unsigned char c){
+        if( c == '\n' && pre_c == '\n') {
+            ss >> socket;
+            int sta;
+            ss >> sta;
+            status = static_cast<judge::STATUS>(sta);
+            judge::result t;
+            while(ss >> t) {
+                results.push_back(t);
+            }
+
+            return true;
+        }
+        ss << c;
+        return false;
+    }
+    std::string encode(){
+        std::stringstream ss;
+        ss << socket << '\n';
+        ss << static_cast<int>(status) << '\n';
+        for (auto& e : results) {
+            ss << e;
+        }
+        ss << '\n';
+        return ss.str();
+    }
+
+private:
+    unsigned char pre_c{0};
+    std::stringstream ss;
+};
+
+
+
+} //namespace JudgeSever
