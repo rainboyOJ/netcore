@@ -23,5 +23,7 @@ void debug_out_noendl(std::ostream &os, Args&&... args){
 
 #define  log(...) debug_out(std::cout,__FILE__,"Line:",__LINE__,":: ",__VA_ARGS__)
 #define log_one(name) log(#name,name)
+#define log_info(...) log(__VA_ARGS__)
+#define log_error(...) log(__VA_ARGS__)
 #define  log_noendl(...) debug_out_noendl(std::cout,__FILE__,"Line:",__LINE__,":: ",__VA_ARGS__)
 #define  log_raw(...) debug_out_noendl(std::cout,__VA_ARGS__)
