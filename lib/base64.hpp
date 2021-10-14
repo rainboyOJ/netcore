@@ -1,13 +1,15 @@
 #include <string>
 #ifndef BASE_64_H
 #define BASE_64_H
+
+const std::string _base64_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; 
 /**
  * Base64 编码/解码
  * @author liruixing
  */
 class Base64{
 private:
-    static const std::string _base64_table;
+    //static const std::string _base64_table {"1b"};
     static const char base64_pad = '=';
 public:
     //Base64() { }
@@ -114,6 +116,6 @@ public:
 };
 
 /*这是Base64编码使用的标准字典*/
-const std::string Base64::_base64_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; 
+//const std::string Base64::_base64_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; 
 
 #endif

@@ -7,6 +7,7 @@
 
 #include "base64.hpp"
 #include "judge/judge.hpp"
+#include "log.hpp"
 
 //信息的传输格式
 namespace JUDGESEVER {
@@ -18,14 +19,14 @@ namespace JUDGESEVER {
 class judgeMessage {
 public:
     judgeMessage() = default;
-    judgeMessage(int time,int memory,int uid ,std::string_view lang,std::string_view code)
-        :time{time},memory{memory},uid{uid},lang{lang},code{code}
+    judgeMessage(int time,int memory,int pid ,int uid,std::string_view lang,std::string_view code)
+        :time{time},memory{memory},pid{pid},uid{uid},lang{lang},code{code}
     {}
 
-    int         time;   //时间限制 ms
-    int         memory; //内存限制 mb
-    int         pid;    //标识
-    int         uid;    //标识
+    int         time{1000};   //时间限制 ms
+    int         memory{128}; //内存限制 mb
+    int         pid{0};    //标识
+    int         uid{0};    //标识
     int         socket;
     std::string lang;
     std::string code;
@@ -96,32 +97,23 @@ public:
     }
 };
 
-std::istream& operator>>(std::istream &__in,judge::result &res){
-    __in >> res.cpu_time 
-        >> res.real_time 
-        >> res.memory    
-        >> res.signal    
-        >> res.exit_code 
-        >> res.error     
-        >> res.result;
-    return __in;
-}
-std::ostream& operator<<(std::ostream &__on,judge::result &res){
-    __on << res.cpu_time << ' '
-        << res.real_time << ' '
-        << res.memory    << ' '
-        << res.signal    << ' '
-        << res.exit_code << ' '
-        << res.error     << ' '
-        << res.result << '\n';
-    return __on;
-}
 
 class resMessage {
 public:
     int                        socket; //哪个socket需要写
     judge::STATUS              status; // 评测的状态
+    std::string                msg;     //相关的信息
     std::vector<judge::result> results; //结果集
+
+    void debug(){
+        log_one(socket);
+        log("status",static_cast<int>(status));
+        log_one(msg);
+        log_one(results.size());
+        for (const auto& e : results) {
+            log(e.result,e.cpu_time,e.real_time,e.memory,e.error,e.exit_code,e.signal);
+        }
+    }
 
     bool decode(unsigned char c){
         if( c == '\n' && pre_c == '\n') {
@@ -129,6 +121,8 @@ public:
             int sta;
             ss >> sta;
             status = static_cast<judge::STATUS>(sta);
+            ss >> msg;
+            msg = Base64::Decode(msg.c_str(), msg.length());
             judge::result t;
             while(ss >> t) {
                 results.push_back(t);
@@ -136,6 +130,7 @@ public:
 
             return true;
         }
+        pre_c = c;
         ss << c;
         return false;
     }
@@ -143,6 +138,7 @@ public:
         std::stringstream ss;
         ss << socket << '\n';
         ss << static_cast<int>(status) << '\n';
+        ss << Base64::Encode(msg.c_str(), msg.length()) << '\n';
         for (auto& e : results) {
             ss << e;
         }

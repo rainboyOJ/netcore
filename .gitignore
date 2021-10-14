@@ -32,5 +32,6 @@
 *.app
 
 server
+client
 src/server
 coredump.*

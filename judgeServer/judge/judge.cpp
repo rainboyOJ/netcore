@@ -9,6 +9,27 @@ std::string readFile(const char * path){
     return ss.str();
 }
 
+std::istream& operator>>(std::istream &__in,result &res){
+    __in >> res.cpu_time 
+        >> res.real_time 
+        >> res.memory    
+        >> res.signal    
+        >> res.exit_code 
+        >> res.error     
+        >> res.result;
+    return __in;
+}
+std::ostream& operator<<(std::ostream &__on,result &res){
+    __on << res.cpu_time << ' '
+        << res.real_time << ' '
+        << res.memory    << ' '
+        << res.signal    << ' '
+        << res.exit_code << ' '
+        << res.error     << ' '
+        << res.result << '\n';
+    return __on;
+}
+
 void exec(const char* cmd,std::ostream& __out) {
     char buffer[128];
     FILE* pipe = popen(cmd, "r");
@@ -26,35 +47,35 @@ void exec(const char* cmd,std::ostream& __out) {
 }
 
 
-    std::string_view result_to_string(RESULT_MEAN mean) {
-        using namespace std::literals;
-        switch(mean){
-            case WRONG_ANSWER:              return "WRONG_ANSWER"sv;
-            case CPU_TIME_LIMIT_EXCEEDED:   return "CPU_TIME_LIMIT_EXCEEDED"sv;
-            case REAL_TIME_LIMIT_EXCEEDED:  return "REAL_TIME_LIMIT_EXCEEDED"sv;
-            case MEMORY_LIMIT_EXCEEDED:     return "MEMORY_LIMIT_EXCEEDED"sv;
-            case RUNTIME_ERROR:             return "RUNTIME_ERROR"sv;
-            case SYSTEM_ERROR:              return "SYSTEM_ERROR"sv;
-            default:    return "UNKOWN"sv;
-        }
+std::string_view result_to_string(RESULT_MEAN mean) {
+    using namespace std::literals;
+    switch(mean){
+        case WRONG_ANSWER:              return "WRONG_ANSWER"sv;
+        case CPU_TIME_LIMIT_EXCEEDED:   return "CPU_TIME_LIMIT_EXCEEDED"sv;
+        case REAL_TIME_LIMIT_EXCEEDED:  return "REAL_TIME_LIMIT_EXCEEDED"sv;
+        case MEMORY_LIMIT_EXCEEDED:     return "MEMORY_LIMIT_EXCEEDED"sv;
+        case RUNTIME_ERROR:             return "RUNTIME_ERROR"sv;
+        case SYSTEM_ERROR:              return "SYSTEM_ERROR"sv;
+        default:    return "UNKOWN"sv;
     }
+}
 
 
-    result __judger(judge_args args){
-        std::stringstream ss;
-        //log("参数",(judge_bin + static_cast<std::string>(args)).c_str() );
-        //std::cout << std::endl ;
-        exec( ( judge_bin + static_cast<std::string>(args)).c_str() ,ss);
-        result RESULT;
-        ss >> RESULT.cpu_time;
-        ss >> RESULT.real_time;
-        ss >> RESULT.memory;
-        ss >> RESULT.signal;
-        ss >> RESULT.exit_code;
-        ss >> RESULT.error;
-        ss >> RESULT.result;
-        return RESULT;
-    }
+result __judger(judge_args args){
+    std::stringstream ss;
+    //log("参数",(judge_bin + static_cast<std::string>(args)).c_str() );
+    //std::cout << std::endl ;
+    exec( ( judge_bin + static_cast<std::string>(args)).c_str() ,ss);
+    result RESULT;
+    ss >> RESULT.cpu_time;
+    ss >> RESULT.real_time;
+    ss >> RESULT.memory;
+    ss >> RESULT.signal;
+    ss >> RESULT.exit_code;
+    ss >> RESULT.error;
+    ss >> RESULT.result;
+    return RESULT;
+}
 
 
 bool Judger::compile(judge_args & args){
@@ -121,8 +142,8 @@ auto Judger::run()->
                 else {
                     //res.result = MEMORY_LIMIT_EXCEEDED;
                     //答案检查
-                        log_one(args.output_path);
-                        log_one(out_file);
+                        //log_one(args.output_path);
+                        //log_one(out_file);
                     if( !cyaron::Check::noipstyle_check(args.output_path.c_str(), out_file) ){
                         res.result = WRONG_ANSWER;
                     }

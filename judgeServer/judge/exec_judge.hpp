@@ -13,7 +13,7 @@
 
 
 #include "judge.hpp"
-//#include "../utils.hpp"
+#include "log.hpp"
 
 namespace judge {
 

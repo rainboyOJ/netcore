@@ -14,6 +14,7 @@
 
 #include "check.hpp"
 #include "lang_support.h"
+#include "problem.hpp"
 
 
 namespace  judge {
@@ -82,6 +83,9 @@ struct result {
     int  result;
 };
 
+std::istream& operator>>(std::istream &__in,result &res);
+std::ostream& operator<<(std::ostream &__on,result &res);
+
 //更好的result
 //struct result_detail {
     //int cpu_time;       //ms
@@ -106,41 +110,51 @@ struct result {
 
 void exec(const char* cmd,std::ostream& __out);
 
-
-
-//得到
+//得到结果
 result __judger(judge_args args);
 
+/**
+* 测评类
+*
+* @param code_full_path 要评测的代码的完整路径
+* lang 语言
+* pid   题目编号
+* problem_base 题目路径
+* code 代码
+*
+* @return 传回
+*
+*/
 struct Judger{
     explicit Judger
     (
         std::string_view code_full_path, //代码的路径
         SUPORT_LANG lang,      //语言
         std::string_view pid,       //problem id
-        std::string_view problem_base
+        std::string_view problem_base,
+        std::string_view code
     ):work_path{ fs::path(code_full_path).parent_path() },
         code_name{fs::path(code_full_path).filename()},
         lang{lang},
         pid{pid},
         problem_base{problem_base}
         {
-            //创建对应的文件夹
-            //if( !  fs::create_directories(work_path) ){
-                //throw std::runtime_error(std::string("创建对应的文件夹 失败") + work_path.string());
-            //}
-            //定入代码
-            //std::ofstream __code(code_path.c_str());
-            //__code << code;
-            //__code.close();
+            //1.创建对应的文件夹
+            if( ! fs::create_directories(work_path) ){
+                throw std::runtime_error(std::string("创建对应的文件夹 失败") + work_path.string());
+            }
+            //2.写入代码
+            std::ofstream __code(code_full_path.data());
+            __code << code;
+            __code.close();
         }
 
     
-    std::tuple<STATUS,std::string,std::vector<result>> 
-        run();       //开始评测
-    bool compile(judge_args & args);
+    auto run()-> std::tuple<STATUS,std::string,std::vector<result>>; //开始评测
+    bool compile(judge_args & args); //编译
     const SUPORT_LANG lang; // 评测的语言
     const std::string pid;  // pid
-    std::string_view problem_base;
+    std::string_view problem_base; //题目的地址
 
     //哪里的位置，开始评测
     fs::path    work_path;

@@ -1,13 +1,15 @@
 #include "judgeServer.h"
+namespace JUDGESEVER {
 
-int JudgeSever::start(){
+int JudgeServer::start(){
 
     // 初始化服务端用于监听的socket。
-    listensock = initserver(port);
+    listensock = initserver();
+    log("建立server 成功");
 
     if (listensock < 0)
     {
-        printf("initserver() failed.\n"); 
+        log("initserver() failed.\n"); 
         return -1;
     }
 
@@ -28,13 +30,13 @@ int JudgeSever::start(){
         // 返回失败。
         if (infds < 0)
         {
-            printf("select() failed.\n"); perror("select()"); break;
+            log("select() failed.\n"); perror("select()"); break;
         }
 
         // 超时，在本程序中，select函数最后一个参数为空，不存在超时的情况，但以下代码还是留着。
         if (infds == 0)
         {
-            printf("select() timeout.\n"); continue;
+            log("select() timeout.\n"); continue;
         }
 
         // 检查有事情发生的socket，包括监听和客户端连接的socket。
@@ -51,36 +53,28 @@ int JudgeSever::start(){
                 int clientsock = accept(listensock,(struct sockaddr*)&client,&len);
                 if (clientsock < 0)
                 {
-                    printf("accept() failed.\n"); continue;
+                    log("accept() failed.\n"); continue;
                 }
 
-                printf ("client(socket=%d) connected ok.\n",clientsock);
+                log("client(socket=%d) connected ok.\n",clientsock);
 
                 // 把新的客户端socket加入集合。
                 FD_SET(clientsock,&readfdset);
 
                 if (maxfd < clientsock) maxfd = clientsock;
-
                 continue;
             }
             else
             {
                 // 客户端有数据过来或客户端的socket连接被断开。
-                char buffer[1024];
-                memset(buffer,0,sizeof(buffer));
-
-                // 读取客户端的数据。
-                ssize_t isize=read(eventfd,buffer,sizeof(buffer));
-
-                // 发生了错误或socket被对方关闭。
-                if (isize <=0)
-                {
-                    printf("client(eventfd=%d) disconnected.\n",eventfd);
-
+                log("recv msg");
+                judgeMessage jm;
+                jm.uid = uuid.get();
+                jm.socket = eventfd;
+                if( recvMessage(eventfd,jm) == false) {
+                    log("client(eventfd=%d) disconnected.\n",eventfd);
                     close(eventfd);  // 关闭客户端的socket。
-
                     FD_CLR(eventfd,&readfdset);  // 从集合中移去客户端的socket。
-
                     // 重新计算maxfd的值，注意，只有当eventfd==maxfd时才需要计算。
                     if (eventfd == maxfd)
                     {
@@ -91,35 +85,34 @@ int JudgeSever::start(){
                                 maxfd = ii; break;
                             }
                         }
-
-                        //printf("maxfd=%d\n",maxfd);
                     }
-
                     continue;
                 }
-
-                printf("recv(eventfd=%d,size=%d):%s\n",eventfd,isize,buffer);
-
+                log("recv msg end");
+                if( jm.lang == "ping"){ //用户发过的ping
+                    log("recv ping");
+                    pong(eventfd);
+                }
                 // 把收到的报文发回给客户端。
-                write(eventfd,buffer,strlen(buffer));
+                //write(eventfd,buffer,strlen(buffer));
             }
         }
     }
 }; 
 
-int JudgeSever::initserver(int port)
+int JudgeServer::initserver()
 {
     int sock = socket(AF_INET,SOCK_STREAM,0);
     if (sock < 0)
     {
-        std::cout << ("socket() failed.\n");
+        log("socket() failed.\n");
         return -1;
     }
 
     // Linux如下
     int opt = 1; unsigned int len = sizeof(opt);
-    setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&opt,len);
-    setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&opt,len);
+    setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&opt,len); //重用
+    setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&opt,len); //长连接
 
     struct sockaddr_in servaddr;
     servaddr.sin_family = AF_INET;
@@ -128,15 +121,17 @@ int JudgeSever::initserver(int port)
 
     if (bind(sock,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0 )
     {
-        printf("bind() failed.\n"); close(sock); return -1;
+        log("bind() failed.\n"); close(sock); return -1;
     }
 
     if (listen(sock,5) != 0 )
     {
-        std::cout << ("listen() failed.\n");
+        log("listen() failed.\n");
         close(sock);
         return -1;
     }
 
     return sock;
 }
+
+} //namespace JudgeSever
