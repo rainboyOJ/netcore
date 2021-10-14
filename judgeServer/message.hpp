@@ -90,7 +90,7 @@ public:
                     else if( key == "code") code = Base64::Decode(value.c_str(), value.size());
                     else if( key == "time") time = atoi(value.c_str());
                     else if( key == "uid")  uid = std::move(value);
-                    else if( key == "pid")  uid = std::move(value);
+                    else if( key == "pid")  pid = std::move(value);
                     else if( key == "memory") memory = atoi(value.c_str());
                     else if( key == "socket") socket = atoi(value.c_str());
                     status = MSGD_STATUS::new_line;

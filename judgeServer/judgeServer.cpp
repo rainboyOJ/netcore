@@ -69,8 +69,8 @@ int JudgeServer::start(){
                 // 客户端有数据过来或客户端的socket连接被断开。
                 log("recv msg");
                 judgeMessage jm;
-                jm.uid = uuid.get();
-                jm.socket = eventfd;
+                //jm.uid = uuid.get();
+                //jm.socket = eventfd;
                 if( recvMessage(eventfd,jm) == false) {
                     log("client(eventfd=%d) disconnected.\n",eventfd);
                     close(eventfd);  // 关闭客户端的socket。
@@ -95,6 +95,7 @@ int JudgeServer::start(){
                 }
                 else { //加入judgeWork的队列
                     log("加入judgeWork的队列");
+                    jm.socket = eventfd;
                     jw.add(jm);
                 }
                 // 把收到的报文发回给客户端。

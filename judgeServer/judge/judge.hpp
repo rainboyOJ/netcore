@@ -64,6 +64,7 @@ enum RESULT_MEAN {
 enum class STATUS : int {
     WAITING,
     ERROR,      //发生了错误
+    COMPILE_ERROR, //编译失败
     JUDGING,
     END
 };
@@ -116,13 +117,13 @@ result __judger(judge_args args);
 class judge_error: public std::exception {
 public:
     judge_error() =delete;
-    explicit judge_error(std::string_view msg)
-        : err_msg{msg}
+    explicit judge_error(STATUS stage,std::string_view msg)
+        : err_msg{msg},_stage{stage}
     {}
 	const char* what() const noexcept override { return err_msg.c_str(); }
-	//STATUS stage() const noexcept { return _stage;}
+    STATUS stage() const noexcept { return _stage;}
 private:
-    //STATUS _stage;
+    STATUS _stage;
     std::string err_msg;
 };
 
@@ -157,7 +158,7 @@ struct Judger{
             std::error_code ec;
             fs::create_directories(work_path,ec);
             if( ec.operator bool() ) //error_code 有值，也就是发生了错误
-                throw judge_error(std::string("创建对应的文件夹时失败: ") + work_path.string());
+                throw judge_error(STATUS::ERROR,std::string("创建对应的文件夹时失败: ") + work_path.string());
                 //throw std::runtime_error(std::string("创建对应的文件夹 失败") + work_path.string());
             //2.写入代码
             log_info("写入代码",code_full_path);
@@ -168,7 +169,7 @@ struct Judger{
 
     
     auto run()-> std::tuple<STATUS,std::string,std::vector<result>>; //开始评测
-    bool compile(judge_args & args); //编译
+    bool compile(judge_args &args); //编译
     const SUPORT_LANG lang; // 评测的语言
     const std::string pid;  // pid
     std::string_view problem_base; //题目的地址

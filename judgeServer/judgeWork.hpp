@@ -30,7 +30,7 @@ public:
         return make_code_path(std::to_string(uid), ext);
     }
     auto get_problem_base() const {
-        return problem_base;
+        return problem_base.c_str();
     }
 
 private:
@@ -50,15 +50,17 @@ void judgeWork<threadsize,qsize>::add(judgeMessage &jm){
                 //1. 是否是支持的语言
                 auto [lang,ext]  = string_to_lang(jm.lang);
                 if( lang == SUPORT_LANG::UNSUPORT)
-                    throw judge::judge_error("不支持的语言 " + jm.lang);
+                    throw judge::judge_error(judge::STATUS::ERROR,"不支持的语言 " + jm.lang);
 
                 //2.创建Judger对象 创建评测所在的文件夹 写入代码
+                log_one(this->get_problem_base());
                 judge::Judger jd( 
                         this->make_code_path(jm.uid, ext).c_str(),
-                        lang, jm.pid, this->get_problem_base().c_str(),
+                        lang, jm.pid, this->get_problem_base(),
                         jm.code
                         );
-                //if( jd.compile(judge_args &args))
+                //3.run 里面compile
+                jd.run();
             }
             catch( judge::judge_error & e){
                 log_error(e.what());
