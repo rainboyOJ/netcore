@@ -19,14 +19,18 @@ namespace JUDGESEVER {
 class judgeMessage {
 public:
     judgeMessage() = default;
-    judgeMessage(int time,int memory,int pid ,int uid,std::string_view lang,std::string_view code)
+    judgeMessage(int time,int memory,std::string_view pid ,std::string_view uid,std::string_view lang,std::string_view code)
         :time{time},memory{memory},pid{pid},uid{uid},lang{lang},code{code}
+    {}
+
+    judgeMessage(int time,int memory,int pid ,int uid,std::string_view lang,std::string_view code)
+        :time{time},memory{memory},pid{std::to_string(pid)},uid{std::to_string(uid)},lang{lang},code{code}
     {}
 
     int         time{1000};   //时间限制 ms
     int         memory{128}; //内存限制 mb
-    int         pid{0};    //标识
-    int         uid{0};    //标识
+    std::string   pid;    //要评测的题目的id
+    std::string   uid;    //标识
     int         socket;
     std::string lang;
     std::string code;
@@ -85,8 +89,8 @@ public:
                     if( key == "lang")      lang = std::move(value);
                     else if( key == "code") code = Base64::Decode(value.c_str(), value.size());
                     else if( key == "time") time = atoi(value.c_str());
-                    else if( key == "uid")  uid = atoi(value.c_str());
-                    else if( key == "pid")  pid = atoi(value.c_str());
+                    else if( key == "uid")  uid = std::move(value);
+                    else if( key == "pid")  uid = std::move(value);
                     else if( key == "memory") memory = atoi(value.c_str());
                     else if( key == "socket") socket = atoi(value.c_str());
                     status = MSGD_STATUS::new_line;

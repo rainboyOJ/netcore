@@ -114,7 +114,9 @@ private:
 class JudgeServer :public baseServer {
 
 public:
-    JudgeServer(short port): port{port} {}
+    JudgeServer(short port, std::string_view problem_base,std::string_view judge_base_path)
+        : port{port} , jw{problem_base,judge_base_path}
+    {}
     int  start(); //启动
     bool send(); //发送评测的结果
     void judge();

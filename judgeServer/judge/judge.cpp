@@ -91,7 +91,8 @@ std::string_view STATUS_to_string(STATUS s){
     switch(s){
         case STATUS::WAITING:       return "WAITING"sv;
         case STATUS::JUDGING:       return "JUDGING"sv;
-        case STATUS::COMPILE_ERROR: return "COMPILE_ERROR"sv;
+        case STATUS::ERROR:       return "ERROR"sv;
+        //case STATUS::COMPILE_ERROR: return "COMPILE_ERROR"sv;
         case STATUS::END:       return "END"sv;
     }
 }
@@ -109,8 +110,9 @@ auto Judger::run()->
             std::string msg = readFile(args.error_path.c_str());
             if( msg.length() == 0)
                 msg =  readFile(args.log_path.c_str());
-            auto a = std::make_tuple(1,2,3);
-            return std::make_tuple(STATUS::COMPILE_ERROR,msg, std::vector<result> {});
+            //auto a = std::make_tuple(1,2,3);
+            //return std::make_tuple(STATUS::COMPILE_ERROR,msg, std::vector<result> {});
+            throw  judge::judge_error(msg);
         }
     }
     catch(...){

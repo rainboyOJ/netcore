@@ -16,7 +16,6 @@
 #include "lang_support.h"
 #include "problem.hpp"
 
-
 namespace  judge {
 
 std::string readFile(std::string_view path);
@@ -60,12 +59,11 @@ enum RESULT_MEAN {
     SYSTEM_ERROR             = 5
 };
 
+//评测的阶段
 enum class STATUS : int {
     WAITING,
-    PROBLEM_ERROR,
-    PROBLEM_DATA_NOT_EXISTS,
+    ERROR,      //发生了错误
     JUDGING,
-    COMPILE_ERROR,
     END
 };
 std::string_view STATUS_to_string(STATUS s);
@@ -113,8 +111,23 @@ void exec(const char* cmd,std::ostream& __out);
 //得到结果
 result __judger(judge_args args);
 
+//评测时发生的错误
+class judge_error: public std::exception {
+public:
+    judge_error() =delete;
+    explicit judge_error(std::string_view msg)
+        : err_msg{msg}
+    {}
+	const char* what() const noexcept override { return err_msg.c_str(); }
+	//STATUS stage() const noexcept { return _stage;}
+private:
+    //STATUS _stage;
+    std::string err_msg;
+};
+
 struct Judger{
     Judger() = delete;
+    Judger(Judger&&) = delete;
     /**
      * 构造函数
      *
@@ -132,15 +145,16 @@ struct Judger{
         std::string_view pid,       //problem id
         std::string_view problem_base,
         std::string_view code
-    ):work_path{ fs::path(code_full_path).parent_path() },
-        code_name{fs::path(code_full_path).filename()},
+    ):  work_path{ fs::path(code_full_path).parent_path() },
+        code_name{ fs::path(code_full_path).filename() },
         lang{lang},
         pid{pid},
         problem_base{problem_base}
         {
             //1.创建对应的文件夹
             if( ! fs::create_directories(work_path) ){
-                throw std::runtime_error(std::string("创建对应的文件夹 失败") + work_path.string());
+                throw judge_error(std::string("创建对应的文件夹时失败: ") + work_path.string());
+                //throw std::runtime_error(std::string("创建对应的文件夹 失败") + work_path.string());
             }
             //2.写入代码
             std::ofstream __code(code_full_path.data());
