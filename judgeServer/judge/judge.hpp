@@ -65,6 +65,7 @@ enum class STATUS : int {
     WAITING,
     ERROR,      //发生了错误
     COMPILE_ERROR, //编译失败
+    COMPILE_END,   // 编译完成
     JUDGING,
     END
 };
@@ -168,7 +169,9 @@ struct Judger{
         }
 
     
-    auto run()-> std::tuple<STATUS,std::string,std::vector<result>>; //开始评测
+    using inject_type = std::function<void(judge::STATUS,std::string,std::vector<result>&&)>;
+    bool run(inject_type); //完整的评测过程
+
     bool compile(judge_args &args); //编译
     const SUPORT_LANG lang; // 评测的语言
     const std::string pid;  // pid

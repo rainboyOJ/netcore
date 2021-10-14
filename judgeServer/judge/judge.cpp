@@ -93,14 +93,14 @@ std::string_view STATUS_to_string(STATUS s){
         case STATUS::JUDGING:       return "JUDGING"sv;
         case STATUS::ERROR:       return "ERROR"sv;
         case STATUS::COMPILE_ERROR: return "COMPILE_ERROR"sv;
+        case STATUS::COMPILE_END: return "COMPILE_END"sv;
         case STATUS::END:       return "END"sv;
     }
 }
 
 //TODO return std::vector<result>
 //返回值 msg类型
-auto Judger::run()->
-        std::tuple<STATUS,std::string,std::vector<result>> 
+bool Judger::run(inject_type inject)
 {
 
     auto args = getCompileArgs(lang, work_path, code_name);
@@ -111,15 +111,16 @@ auto Judger::run()->
         //auto a = std::make_tuple(1,2,3);
         //return std::make_tuple(STATUS::COMPILE_ERROR,msg, std::vector<result> {});
         throw  judge::judge_error(STATUS::COMPILE_ERROR,msg);
+        inject(judge::STATUS::COMPILE_END,"compile_end",{});
     }
 
     std::vector<result> results{};
     try {
 
         Problem p(problem_base,pid); //根据pid拿到 数据列表
-        auto time_limit = 1000;
+        auto time_limit = 1000; // TODO 传递过来的值来改
         auto memory_limit = 128;
-        log_one(p.input_data.size());
+        //log_one(p.input_data.size());
 
         for(int i=0;i<p.input_data.size();++i){    // 循环进行判断
             auto& in_file = p.input_data[i].second;
@@ -131,6 +132,7 @@ auto Judger::run()->
             //log(i, static_cast<std::string>(args) );
             auto res = __judger(args);
             print_result(res);
+
             if( res.error != 0  || res.result !=0)
                 results.push_back(res);
             else  {
@@ -148,13 +150,16 @@ auto Judger::run()->
                     }
                 }
                 results.push_back(res);
+                inject(judge::STATUS::JUDGING,std::to_string(i),{ res });
             }
         }
     }
     catch (std::exception &e){
         throw  judge_error(STATUS::ERROR,e.what());
     }
-    return std::make_tuple(STATUS::END,"", std::move(results));
+    //return std::make_tuple(STATUS::END,"", std::move(results));
+    inject(judge::STATUS::END,"judge_end",std::move(results));
+    return true;
 }
 
 }; // namespace judge

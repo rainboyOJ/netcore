@@ -1,5 +1,5 @@
 //和judgeServer进行通信的client
-//
+#include <thread>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -51,12 +51,27 @@ public:
     //std::function<void(resMessage)> deal
     bool dealRecv(){
         resMessage res;
+        int i;
+        fd_set tmpfd;
+        FD_ZERO(&tmpfd);
+        FD_SET(sockfd,&tmpfd);
+
+        if ( (i = select(sockfd+1,&tmpfd,0,0,0)) <= 0 ) return false;
+
         if( recvMessage(sockfd, res) == false) {
             log("recvMessage fail");
             return false;
         }
         res.debug();
-        return 1;
+        return true;
+    }
+
+    void startRecvThread() {
+        read_thread = std::thread([this](){
+            while ( 1 ) {
+                this->dealRecv();
+            }
+        });
     }
 
     //发送judge信息
@@ -67,6 +82,7 @@ public:
         return sendMessag(sockfd, jm);
     }
 
+    std::thread read_thread;
 private:
     bool isConnect{false}; //是否和JudgeSever 连接
     short port;
