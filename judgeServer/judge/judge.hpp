@@ -15,6 +15,7 @@
 #include "check.hpp"
 #include "lang_support.h"
 #include "problem.hpp"
+#include "log.hpp"
 
 namespace  judge {
 
@@ -152,11 +153,13 @@ struct Judger{
         problem_base{problem_base}
         {
             //1.创建对应的文件夹
+            log_info("创建对应的文件夹",work_path);
             if( ! fs::create_directories(work_path) ){
                 throw judge_error(std::string("创建对应的文件夹时失败: ") + work_path.string());
                 //throw std::runtime_error(std::string("创建对应的文件夹 失败") + work_path.string());
             }
             //2.写入代码
+            log_info("写入代码",code_full_path);
             std::ofstream __code(code_full_path.data());
             __code << code;
             __code.close();

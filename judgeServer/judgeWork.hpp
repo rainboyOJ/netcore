@@ -58,8 +58,10 @@ void judgeWork<threadsize,qsize>::add(judgeMessage &jm){
                         lang, jm.pid, this->get_problem_base().c_str(),
                         jm.code
                         );
+                //if( jd.compile(judge_args &args))
             }
             catch( judge::judge_error & e){
+                log_error(e.what());
             }
             //1.前期检查
             //2.编译
