@@ -114,12 +114,18 @@ private:
 class JudgeServer :public baseServer {
 
 public:
+    using resType = std::shared_ptr<resMessage>;
     JudgeServer(short port, std::string_view problem_base,std::string_view judge_base_path)
-        : port{port} , jw{problem_base,judge_base_path}
+        : port{port} , jw{this,4,problem_base,judge_base_path}
     {}
     int  start(); //启动
     bool send(); //发送评测的结果
     void judge();
+    void addResMessage(resType res){
+        sendResThpool.commit([res,this](){
+                this->sendMessag(res->socket, *res);
+        });
+    }
 
 private:
     int initserver();
@@ -129,7 +135,9 @@ private:
     fd_set readfdset;  // 读事件的集合，包括监听socket和客户端连接上来的socket。
 
     UUID<int> uuid;
-    judgeWork<4, 1000> jw;
+    judgeWork<JudgeServer> jw;
+    THREAD_POOL::threadpool sendResThpool{1}; //单个线程
+
 };
 
 } //namespace JudgeSever

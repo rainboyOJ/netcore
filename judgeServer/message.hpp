@@ -110,6 +110,11 @@ public:
     std::string                msg;     //相关的信息
     std::vector<judge::result> results; //结果集
 
+    resMessage() = default;
+    resMessage(int socket,judge::STATUS status,std::string_view msg,std::vector<judge::result>&& results)
+        :socket{socket},status{status},msg{msg},results{results}
+    { }
+
     void debug() const{
         log_one(socket);
         log("status",static_cast<int>(status));

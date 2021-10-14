@@ -9,14 +9,14 @@
 using JUDGESEVER::judgeMessage;
 using JUDGESEVER::resMessage;
 
-template<size_t threadsize=4,size_t qsize=100000>
+template<typename JudgeSever>
 class judgeWork {
 public:
     judgeWork() = delete;
-    explicit judgeWork(std::string_view problem_base,std::string_view judge_base_path)
-        : problem_base{problem_base},judge_base_path{judge_base_path}
+    explicit judgeWork(JudgeSever * js,unsigned int poolsize,std::string_view problem_base,std::string_view judge_base_path)
+        : thpool{poolsize}, problem_base{problem_base},judge_base_path{judge_base_path},
+        js{js}
     {}
-    using resType = std::shared_ptr<resMessage>;
     void add(judgeMessage &m); //加入数据
     void judge(judgeMessage m); //memfunc
     bool get_result();
@@ -35,14 +35,14 @@ public:
 
 private:
 
-    THREAD_POOL::threadpool thpool{threadsize};
-    lockFreeQueue<resType,qsize> lfque;
+    THREAD_POOL::threadpool thpool;
     fs::path problem_base; //题目的路径
     fs::path judge_base_path; //评测的路径
+    JudgeSever* js;
 };
 
-template<size_t threadsize,size_t qsize>
-void judgeWork<threadsize,qsize>::add(judgeMessage &jm){
+template<typename JudgeSever>
+void judgeWork<JudgeSever>::add(judgeMessage &jm){
     thpool.commit([this,jm](){
             log("=====开始评测=======");
             //jm.debug();
@@ -60,7 +60,12 @@ void judgeWork<threadsize,qsize>::add(judgeMessage &jm){
                         jm.code
                         );
                 //3.run 里面compile
-                jd.run();
+                auto res  = jd.run();
+                this->js->addResMessage(std::make_shared<resMessage>(jm.socket,
+                            judge::STATUS::END,
+                            "ok",
+                            std::move(std::get<2>(res))
+                            ));
             }
             catch( judge::judge_error & e){
                 log_error(e.what());
