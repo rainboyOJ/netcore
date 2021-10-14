@@ -52,7 +52,7 @@ void judgeWork<threadsize,qsize>::add(judgeMessage &jm){
                 if( lang == SUPORT_LANG::UNSUPORT)
                     throw judge::judge_error("不支持的语言 " + jm.lang);
 
-                //2.创建Judger对象 进行相应的
+                //2.创建Judger对象 创建评测所在的文件夹 写入代码
                 judge::Judger jd( 
                         this->make_code_path(jm.uid, ext).c_str(),
                         lang, jm.pid, this->get_problem_base().c_str(),

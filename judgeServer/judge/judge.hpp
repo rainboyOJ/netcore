@@ -154,10 +154,11 @@ struct Judger{
         {
             //1.创建对应的文件夹
             log_info("创建对应的文件夹",work_path);
-            if( ! fs::create_directories(work_path) ){
+            std::error_code ec;
+            fs::create_directories(work_path,ec);
+            if( ec.operator bool() ) //error_code 有值，也就是发生了错误
                 throw judge_error(std::string("创建对应的文件夹时失败: ") + work_path.string());
                 //throw std::runtime_error(std::string("创建对应的文件夹 失败") + work_path.string());
-            }
             //2.写入代码
             log_info("写入代码",code_full_path);
             std::ofstream __code(code_full_path.data());
