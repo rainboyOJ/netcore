@@ -6,8 +6,8 @@ target= lang_support.o judgeServer.o judge.o
 server: main.cpp $(target)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDE)
 
-client: client.cpp  $(target)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDE)
+client: client.cpp client.hpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(INCLUDE)
 
 lang_support.o: judge/lang_support.cpp judge/lang_support.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDE)

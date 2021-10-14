@@ -36,12 +36,13 @@ private:
     std::string key;
     std::string value;
 public:
-    void debug(){
-        msg_dbg_out(time);
-        msg_dbg_out(memory);
-        msg_dbg_out(uid);
-        msg_dbg_out(lang);
-        msg_dbg_out(code);
+    void debug() const{
+        log_one(time);
+        log_one(memory);
+        log_one(uid);
+        log_one(uid);
+        log_one(lang);
+        log_one(code);
     }
     std::string encode(){
         std::stringstream ss;
@@ -105,7 +106,7 @@ public:
     std::string                msg;     //相关的信息
     std::vector<judge::result> results; //结果集
 
-    void debug(){
+    void debug() const{
         log_one(socket);
         log("status",static_cast<int>(status));
         log_one(msg);
@@ -124,7 +125,13 @@ public:
             ss >> msg;
             msg = Base64::Decode(msg.c_str(), msg.length());
             judge::result t;
-            while(ss >> t) {
+            while( ss >> t.cpu_time 
+                    >> t.real_time 
+                    >> t.memory    
+                    >> t.signal    
+                    >> t.exit_code 
+                    >> t.error     
+                    >> t.result) {
                 results.push_back(t);
             }
 
@@ -140,7 +147,14 @@ public:
         ss << static_cast<int>(status) << '\n';
         ss << Base64::Encode(msg.c_str(), msg.length()) << '\n';
         for (auto& e : results) {
-            ss << e;
+            //ss << e;
+            ss << e.cpu_time << ' '
+                << e.real_time << ' '
+                << e.memory    << ' '
+                << e.signal    << ' '
+                << e.exit_code << ' '
+                << e.error     << ' '
+                << e.result << '\n';
         }
         ss << '\n';
         return ss.str();

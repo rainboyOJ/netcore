@@ -59,6 +59,14 @@ public:
         return 1;
     }
 
+    //发送judge信息
+    // time memory pid uid lang code
+    bool sendJudge(int time,int memory, int pid, int uid,
+            std::string_view lang, std::string_view code){
+        judgeMessage jm(time,memory,pid,uid,lang,code);
+        return sendMessag(sockfd, jm);
+    }
+
 private:
     bool isConnect{false}; //是否和JudgeSever 连接
     short port;

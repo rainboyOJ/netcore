@@ -113,19 +113,18 @@ void exec(const char* cmd,std::ostream& __out);
 //得到结果
 result __judger(judge_args args);
 
-/**
-* 测评类
-*
-* @param code_full_path 要评测的代码的完整路径
-* lang 语言
-* pid   题目编号
-* problem_base 题目路径
-* code 代码
-*
-* @return 传回
-*
-*/
 struct Judger{
+    Judger() = delete;
+    /**
+     * 构造函数
+     *
+     * @param code_full_path 要评测的代码的完整路径
+     * @param lang 语言
+     * @param pid  题目编号
+     * @param problem_base 题目路径
+     * @param code 代码
+     *
+     */
     explicit Judger
     (
         std::string_view code_full_path, //代码的路径

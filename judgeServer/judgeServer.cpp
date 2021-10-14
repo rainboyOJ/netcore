@@ -93,6 +93,10 @@ int JudgeServer::start(){
                     log("recv ping");
                     pong(eventfd);
                 }
+                else { //加入judgeWork的队列
+                    log("加入judgeWork的队列");
+                    jw.add(jm);
+                }
                 // 把收到的报文发回给客户端。
                 //write(eventfd,buffer,strlen(buffer));
             }
