@@ -117,8 +117,10 @@ result __judger(judge_args args);
 class judge_error: public std::exception {
 public:
     judge_error() =delete;
-    explicit judge_error(STATUS stage,std::string_view msg)
-        : err_msg{msg},_stage{stage}
+
+    template<typename STR>//为了性能
+    explicit judge_error(STATUS stage,STR&& msg) //万能引用
+        : err_msg{std::forward<STR>(msg)},_stage{stage}
     {}
 	const char* what() const noexcept override { return err_msg.c_str(); }
     STATUS stage() const noexcept { return _stage;}

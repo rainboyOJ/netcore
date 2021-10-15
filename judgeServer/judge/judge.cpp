@@ -81,7 +81,6 @@ result __judger(judge_args args){
 bool Judger::compile(judge_args & args){
     //compile_python_args(work_path, code_file_name.c_str());
     auto res = __judger(args);
-    print_result(res);
     return res.exit_code == 0 && res.error == 0;
 }
 
@@ -107,12 +106,10 @@ bool Judger::run(inject_type inject)
     if( !compile(args) ){
         std::string msg = readFile(args.error_path.c_str());
         if( msg.length() == 0)
-            msg =  readFile(args.log_path.c_str());
-        //auto a = std::make_tuple(1,2,3);
-        //return std::make_tuple(STATUS::COMPILE_ERROR,msg, std::vector<result> {});
-        throw  judge::judge_error(STATUS::COMPILE_ERROR,msg);
-        inject(judge::STATUS::COMPILE_END,"compile_end",{});
+            msg = readFile(args.log_path.c_str());
+        throw  judge::judge_error(STATUS::COMPILE_ERROR,std::move(msg));
     }
+    inject(judge::STATUS::COMPILE_END,"compile_end",{});
 
     std::vector<result> results{};
     try {
@@ -131,13 +128,13 @@ bool Judger::run(inject_type inject)
             auto args = getJudgeArgs(lang, work_path, code_name, in_file, user_out_file, time_limit, 128+memory_limit);
             //log(i, static_cast<std::string>(args) );
             auto res = __judger(args);
-            print_result(res);
+            //print_result(res);
 
             if( res.error != 0  || res.result !=0)
                 results.push_back(res);
             else  {
                 //查检memory
-                if( res.memory >= 1024ull * 1024 *1024 * memory_limit){
+                if( res.memory >= 1024ull * 1024 *1024 * memory_limit){ //TODO
                     res.result = MEMORY_LIMIT_EXCEEDED;
                 }
                 else {

@@ -59,14 +59,14 @@ void judgeWork<JudgeSever>::add(judgeMessage &jm){
                         jm.code
                         );
                 //3.run 里面compile
-                auto res  = jd.run([&](judge::STATUS stat,std::string msg,
-                            std::vector<judge::result>&& results
-                            ){
-                        this->js->addResMessage(std::make_shared<resMessage>(jm.socket,
+                auto res  = jd.run([&]( judge::STATUS stat,std::string msg,
+                                        std::vector<judge::result>&& results ){
+                            this->js->addResMessage(
+                                    std::make_shared<resMessage>(jm.socket,
                                     stat,
                                     std::move(msg),
-                                    std::move(results)
-                                    ));
+                                    std::move(results) )
+                                    );
                         });
             }
             catch( judge::judge_error & e){
