@@ -13,8 +13,9 @@
 namespace JUDGESEVER {
 
 //发送的信息
-class judgeMessage {
+class judgeMessage : public std::enable_shared_from_this<judgeMessage> {
 public:
+    using SHR_PTR = std::shared_ptr<judgeMessage>;
     judgeMessage() = default;
     judgeMessage(int time,int memory,std::string_view pid ,std::string_view uid,std::string_view lang,std::string_view code)
         :time{time},memory{memory},pid{pid},uid{uid},lang{lang},code{code}
@@ -100,8 +101,10 @@ public:
 };
 
 
-class resMessage {
+class resMessage : public std::enable_shared_from_this<resMessage>{
 public:
+    using SHR_PTR = std::shared_ptr<resMessage>;
+
     int                        socket; //哪个socket需要写
     judge::STATUS              status; // 评测的状态
     std::string                msg;     //相关的信息
