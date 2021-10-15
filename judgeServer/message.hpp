@@ -7,13 +7,10 @@
 
 #include "base64.hpp"
 #include "judge/judge.hpp"
-#include "log.hpp"
+#include "log.h"
 
 //信息的传输格式
 namespace JUDGESEVER {
-
-//message decode status
-#define msg_dbg_out(one) std::cout << #one << ": " <<  one  << std::endl
 
 //发送的信息
 class judgeMessage {
@@ -41,12 +38,12 @@ private:
     std::string value;
 public:
     void debug() const{
-        log_one(time);
-        log_one(memory);
-        log_one(uid);
-        log_one(uid);
-        log_one(lang);
-        log_one(code);
+        LOG_DEBUG("time= %d",time);
+        LOG_DEBUG("memory= %d",memory);
+        LOG_DEBUG("uid= %s",uid.c_str());
+        LOG_DEBUG("pid= %s",pid.c_str());
+        LOG_DEBUG("lang= %s",lang.c_str());
+        LOG_DEBUG("code= %s",code.c_str());
     }
     std::string encode(){
         std::stringstream ss;
@@ -116,12 +113,13 @@ public:
     { }
 
     void debug() const{
-        log_one(socket);
-        log("status",static_cast<int>(status));
-        log_one(msg);
-        log_one(results.size());
+        LOG_DEBUG("socket=%d ",socket);
+        LOG_DEBUG("status= %d",static_cast<int>(status));
+        LOG_DEBUG("status_mean = %s",judge::STATUS_to_string(status).data());
+        LOG_DEBUG("msg = %s",msg.c_str());
+        LOG_DEBUG("results size = %d",results.size());
         for (const auto& e : results) {
-            log(e.result,e.cpu_time,e.real_time,e.memory,e.error,e.exit_code,e.signal);
+            LOG_DEBUG( "%d %d %d %d %d %d %d", e.result,e.cpu_time,e.real_time,e.memory,e.error,e.exit_code,e.signal);
         }
     }
 

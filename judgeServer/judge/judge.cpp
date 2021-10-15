@@ -125,8 +125,8 @@ bool Judger::run(inject_type inject)
         for(int i=0;i<p.input_data.size();++i){    // 循环进行判断
             auto& in_file = p.input_data[i].second;
             auto& out_file = p.output_data[i].second;
-            log("in_file",in_file);
-            log("out_file",out_file);
+            //log("in_file",in_file);
+            //log("out_file",out_file);
             std::string user_out_file = "out"+std::to_string(i);
             auto args = getJudgeArgs(lang, work_path, code_name, in_file, user_out_file, time_limit, 128+memory_limit);
             //log(i, static_cast<std::string>(args) );

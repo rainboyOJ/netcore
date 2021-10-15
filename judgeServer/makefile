@@ -3,11 +3,14 @@ CXXFLAGS = -g -std=c++17
 INCLUDE = -I../lib -I./judge -lpthread
 target= lang_support.o judgeServer.o judge.o
 
-server: main.cpp $(target)
+LIB_SRC=$(wildcard ../lib/*.cpp)
+LIB_OBJECT=$(patsubst %.cpp,%.o,$(LIB_SRC))
+
+server: main.cpp $(LIB_OBJECT) $(target) 
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDE)
 
-client: client.cpp client.hpp
-	$(CXX) $(CXXFLAGS) -o $@ $< $(INCLUDE)
+client: client.cpp client.hpp $(LIB_OBJECT) $(target)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDE)
 
 lang_support.o: judge/lang_support.cpp judge/lang_support.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(INCLUDE)
@@ -22,4 +25,5 @@ judge.o: judge/judge.cpp judge/judge.hpp
 
 
 clean:
-	rm -rf server client $(target)
+	rm -rf server client $(target) ${LIB_OBJECT}
+

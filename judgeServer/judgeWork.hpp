@@ -2,8 +2,8 @@
 #include "lockfree_queue.hpp"
 #include "threadpool.hpp"
 #include "message.hpp"
-#include "log.hpp"
 #include "judge/judge.hpp"
+#include "log.h"
 
 
 using JUDGESEVER::judgeMessage;
@@ -44,7 +44,7 @@ private:
 template<typename JudgeSever>
 void judgeWork<JudgeSever>::add(judgeMessage &jm){
     thpool.commit([this,jm](){
-            log("=====开始评测=======");
+            LOG_DEBUG("=====开始评测=======");
             //jm.debug();
             try {
                 //1. 是否是支持的语言
@@ -53,7 +53,6 @@ void judgeWork<JudgeSever>::add(judgeMessage &jm){
                     throw judge::judge_error(judge::STATUS::ERROR,"不支持的语言 " + jm.lang);
 
                 //2.创建Judger对象 创建评测所在的文件夹 写入代码
-                log_one(this->get_problem_base());
                 judge::Judger jd( 
                         this->make_code_path(jm.uid, ext).c_str(),
                         lang, jm.pid, this->get_problem_base(),
@@ -71,7 +70,7 @@ void judgeWork<JudgeSever>::add(judgeMessage &jm){
                         });
             }
             catch( judge::judge_error & e){
-                log_error(e.what());
+                LOG_ERROR(e.what());
             }
             //1.前期检查
             //2.编译

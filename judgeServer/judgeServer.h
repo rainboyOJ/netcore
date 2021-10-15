@@ -6,10 +6,10 @@
 #include <arpa/inet.h>
 #include <sys/fcntl.h>
 
-#include "log.hpp"
 #include "message.hpp"
 #include "uuid.hpp"
 #include "judgeWork.hpp"
+#include "log.h"
 
 namespace JUDGESEVER {
 
@@ -24,16 +24,16 @@ protected:
     template<typename T>
     bool sendMessag(int sockfd,T &m){
         auto mstr = m.encode();
-        log("needSendSize",mstr.length());
+        //log("needSendSize",mstr.length());
         int mlen = htonl(mstr.length());
         std::string ss;;
         ss.resize(4);
         memcpy(ss.data(), &mlen , sizeof(mlen));
         ss.append(mstr);
-        for (const auto& e : ss) {
-            std::cout << std::hex << int(e) << " ";
-        }
-        std::cout  << std::endl;
+        //for (const auto& e : ss) {
+            //std::cout << std::hex << int(e) << " ";
+        //}
+        //std::cout  << std::endl;
         return Writen(sockfd, ss) == ss.length();
     }
 
@@ -43,17 +43,17 @@ protected:
         char buf[bufsiz];
         if( Readn(sockfd,4,buf) != 4) return false;
         int needReadSize = ntohl(*reinterpret_cast<int *>(buf));
-        log_one(needReadSize);
+        //log_one(needReadSize);
         while (needReadSize > 0) {
             int readn = Readn(sockfd,needReadSize,buf);
-            log_one(readn);
+            //log_one(readn);
             if(  readn ==-1 ) return false;
             for(int i=0;i<readn;++i){
                 m.decode(buf[i]); // TODO last readStatus
             }
             needReadSize -= readn;
         }
-        std::cout  << std::endl;
+        //std::cout  << std::endl;
         return true;
     }
 
@@ -92,16 +92,16 @@ private:
     {
         int nLeft,total,nread,idx;
         total = nLeft = std::min(n,bufsiz);
-        log_one(total);
+        //log_one(total);
         idx = 0;
 
         while(nLeft > 0)
         {
             if ( (nread = read(sockfd,buf+ idx,nLeft)) <= 0) return -1;
-            for(int i=0;i<nread;++i){
-               std::cout << std::hex << int(buf[i]) << " ";
-            }
-            std::cout  << std::endl;
+            //for(int i=0;i<nread;++i){
+               //std::cout << std::hex << int(buf[i]) << " ";
+            //}
+            //std::cout  << std::endl;
 
             idx += nread;
             nLeft -= nread;

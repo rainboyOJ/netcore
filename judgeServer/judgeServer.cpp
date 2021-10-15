@@ -5,11 +5,11 @@ int JudgeServer::start(){
 
     // 初始化服务端用于监听的socket。
     listensock = initserver();
-    log("建立server 成功");
+    LOG_INFO("建立server 成功");
 
     if (listensock < 0)
     {
-        log("initserver() failed.\n"); 
+        LOG_INFO("initserver() failed.\n"); 
         return -1;
     }
 
@@ -30,13 +30,13 @@ int JudgeServer::start(){
         // 返回失败。
         if (infds < 0)
         {
-            log("select() failed.\n"); perror("select()"); break;
+            LOG_INFO("select() failed.\n"); perror("select()"); break;
         }
 
         // 超时，在本程序中，select函数最后一个参数为空，不存在超时的情况，但以下代码还是留着。
         if (infds == 0)
         {
-            log("select() timeout.\n"); continue;
+            LOG_INFO("select() timeout.\n"); continue;
         }
 
         // 检查有事情发生的socket，包括监听和客户端连接的socket。
@@ -53,10 +53,10 @@ int JudgeServer::start(){
                 int clientsock = accept(listensock,(struct sockaddr*)&client,&len);
                 if (clientsock < 0)
                 {
-                    log("accept() failed.\n"); continue;
+                    LOG_INFO("accept() failed.\n"); continue;
                 }
 
-                log("client(socket=%d) connected ok.\n",clientsock);
+                LOG_INFO("client(socket=%d) connected ok.\n",clientsock);
 
                 // 把新的客户端socket加入集合。
                 FD_SET(clientsock,&readfdset);
@@ -67,12 +67,12 @@ int JudgeServer::start(){
             else
             {
                 // 客户端有数据过来或客户端的socket连接被断开。
-                log("recv msg");
+                LOG_DEBUG("recv msg");
                 judgeMessage jm;
                 //jm.uid = uuid.get();
                 //jm.socket = eventfd;
                 if( recvMessage(eventfd,jm) == false) {
-                    log("client(eventfd=%d) disconnected.\n",eventfd);
+                    LOG_INFO("client(eventfd=%d) disconnected.\n",eventfd);
                     close(eventfd);  // 关闭客户端的socket。
                     FD_CLR(eventfd,&readfdset);  // 从集合中移去客户端的socket。
                     // 重新计算maxfd的值，注意，只有当eventfd==maxfd时才需要计算。
@@ -88,13 +88,13 @@ int JudgeServer::start(){
                     }
                     continue;
                 }
-                log("recv msg end");
+                LOG_DEBUG("recv msg end");
                 if( jm.lang == "ping"){ //用户发过的ping
-                    log("recv ping");
+                    LOG_DEBUG("recv ping");
                     pong(eventfd);
                 }
                 else { //加入judgeWork的队列
-                    log("加入judgeWork的队列");
+                    LOG_DEBUG("加入judgeWork的队列");
                     jm.socket = eventfd;
                     jw.add(jm);
                 }
@@ -110,7 +110,7 @@ int JudgeServer::initserver()
     int sock = socket(AF_INET,SOCK_STREAM,0);
     if (sock < 0)
     {
-        log("socket() failed.\n");
+        LOG_INFO("socket() failed.\n");
         return -1;
     }
 
@@ -126,12 +126,12 @@ int JudgeServer::initserver()
 
     if (bind(sock,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0 )
     {
-        log("bind() failed.\n"); close(sock); return -1;
+        LOG_INFO("bind() failed.\n"); close(sock); return -1;
     }
 
     if (listen(sock,5) != 0 )
     {
-        log("listen() failed.\n");
+        LOG_INFO("listen() failed.\n");
         close(sock);
         return -1;
     }

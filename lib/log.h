@@ -6,8 +6,6 @@
 #include <string>
 #include <cstring>
 
-namespace  fs = std::filesystem;
-
 //extern std::mutex g_log_mutex;  //
 //template<char Delimiter = ' ',typename... Args>
 //void debug_out(std::ostream &os, Args&&... args){
@@ -49,7 +47,7 @@ namespace  fs = std::filesystem;
 
 class Log {
 public:
-    void init(int level);   //使用stout作为log
+    void init_default();   //使用stout作为log
     void init(int level, const char* path = "./log", 
                 const char* suffix =".log",
                 int maxQueueCapacity = 1024);
@@ -57,7 +55,7 @@ public:
     static Log* Instance();
     static void FlushLogThread();
 
-    void write(int level, const char *format,...);
+    void write(int level,bool newline ,const char *format,...);
     void flush();
 
     int GetLevel();
@@ -96,18 +94,18 @@ private:
     std::mutex mtx_;
 };
 
-#define LOG_BASE(level, format, ...) \
+#define LOG_BASE(level, newline,format, ...) \
     do {\
         Log* log = Log::Instance();\
         if (log->IsOpen() && log->GetLevel() <= level) {\
-            log->write(level, format, ##__VA_ARGS__); \
+            log->write(level, newline,format, ##__VA_ARGS__); \
             log->flush();\
         }\
     } while(0);
 
-#define LOG_DEBUG(format, ...) do {LOG_BASE(0, format, ##__VA_ARGS__)} while(0);
-#define LOG_INFO(format, ...) do {LOG_BASE(1, format, ##__VA_ARGS__)} while(0);
-#define LOG_WARN(format, ...) do {LOG_BASE(2, format, ##__VA_ARGS__)} while(0);
-#define LOG_ERROR(format, ...) do {LOG_BASE(3, format, ##__VA_ARGS__)} while(0);
+#define LOG_DEBUG(format, ...) do {LOG_BASE(0,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(0,1, format, ##__VA_ARGS__)} while(0);
+#define LOG_INFO(format, ...) do {LOG_BASE(1,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(1,1, format, ##__VA_ARGS__)} while(0);
+#define LOG_WARN(format, ...) do {LOG_BASE(2,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(2,1, format, ##__VA_ARGS__)} while(0);
+#define LOG_ERROR(format, ...) do {LOG_BASE(3,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(3,1, format, ##__VA_ARGS__)} while(0);
 
 #endif //LOG_H

@@ -41,9 +41,9 @@ void Log::SetLevel(int level) {
     level_ = level;
 }
 
-void Log::init(int level = 0 )
+void Log::init_default()
 { 
-    level_     = level;
+    level_     = 0;
     isOpen_    = true;
     USE_STDOUT = true;
     isAsync_   = true;
@@ -114,7 +114,7 @@ void Log::init(int level = 1, const char* path, const char* suffix,
     }
 }
 
-void Log::write(int level, const char *format, ...) {
+void Log::write(int level, bool newline,const char *format, ...) {
     struct timeval now = {0, 0};
     gettimeofday(&now, nullptr);
     time_t tSec = now.tv_sec;
@@ -152,11 +152,13 @@ void Log::write(int level, const char *format, ...) {
     {
         unique_lock<mutex> locker(mtx_);
         lineCount_++;
-        int n = snprintf(buff_.BeginWrite(), 128, "%d-%02d-%02d %02d:%02d:%02d.%06ld ",
+        if( !USE_STDOUT ) {
+            int n = snprintf(buff_.BeginWrite(), 128, "%d-%02d-%02d %02d:%02d:%02d.%06ld ",
                     t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
                     t.tm_hour, t.tm_min, t.tm_sec, now.tv_usec);
-                    
-        buff_.HasWritten(n);
+
+            buff_.HasWritten(n);
+        }
         AppendLogLevelTitle_(level);
 
         va_start(vaList, format);
@@ -164,7 +166,10 @@ void Log::write(int level, const char *format, ...) {
         va_end(vaList);
 
         buff_.HasWritten(m);
-        buff_.Append("\n\0", 2);
+        if( newline )
+            buff_.Append("\n\0", 2);
+        else
+            buff_.Append("\0", 1);
 
         if(isAsync_ && deque_ && !deque_->full()) {
             deque_->push_back(buff_.RetrieveAllToStr());

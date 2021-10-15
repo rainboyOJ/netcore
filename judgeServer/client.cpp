@@ -5,6 +5,7 @@
 using namespace JUDGESEVER;
 std::string code = "#include <cstdio>\n int main() { int a,b; scanf(\"%d%d\",&a,&b); printf(\"%d\",a+b); return 0;}";
 int main(){
+    Log::Instance()->init_default();
     judgeClient client("127.0.0.1",8787);
     int i=0;
     //while ( 1 ) {

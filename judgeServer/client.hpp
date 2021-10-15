@@ -48,6 +48,11 @@ public:
         return baseServer::ping(sockfd);
     }
 
+    void deal_pong();
+    void deal_judge_frame();
+    void deal_compile_error();
+    void deal_judge_error();
+
     //std::function<void(resMessage)> deal
     bool dealRecv(){
         resMessage res;
@@ -59,7 +64,7 @@ public:
         if ( (i = select(sockfd+1,&tmpfd,0,0,0)) <= 0 ) return false;
 
         if( recvMessage(sockfd, res) == false) {
-            log("recvMessage fail");
+            LOG_INFO("recvMessage fail");
             return false;
         }
         res.debug();
