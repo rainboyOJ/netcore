@@ -90,10 +90,11 @@ std::string_view STATUS_to_string(STATUS s){
     switch(s){
         case STATUS::WAITING:       return "WAITING"sv;
         case STATUS::JUDGING:       return "JUDGING"sv;
-        case STATUS::ERROR:       return "ERROR"sv;
+        case STATUS::ERROR:         return "ERROR"sv;
         case STATUS::COMPILE_ERROR: return "COMPILE_ERROR"sv;
-        case STATUS::COMPILE_END: return "COMPILE_END"sv;
-        case STATUS::END:       return "END"sv;
+        case STATUS::COMPILE_END:   return "COMPILE_END"sv;
+        case STATUS::END:           return "END"sv;
+        case STATUS::PROBLEM_INFO:  return "PROBLEM_INFO"sv;
     }
 }
 
@@ -118,6 +119,8 @@ bool Judger::run(inject_type inject)
         auto time_limit = 1000; // TODO 传递过来的值来改
         auto memory_limit = 128;
         //log_one(p.input_data.size());
+        inject(judge::STATUS::PROBLEM_INFO,std::to_string(p.input_data.size()),{});
+
 
         for(int i=0;i<p.input_data.size();++i){    // 循环进行判断
             auto& in_file = p.input_data[i].second;

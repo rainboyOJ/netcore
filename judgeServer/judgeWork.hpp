@@ -46,6 +46,12 @@ void judgeWork<JudgeSever>::add(judgeMessage &jm){
     thpool.commit([this,jm](){
             LOG_DEBUG("=====开始评测=======");
             //jm.debug();
+            auto inject  = 
+                [&]( judge::STATUS stat,std::string msg, std::vector<judge::result>&& results ){
+                         this->js->addResMessage(
+                            std::make_shared<resMessage>(jm.socket, stat, std::move(msg), std::move(results) )
+                         );
+                        };
             try {
                 //1. 是否是支持的语言
                 auto [lang,ext]  = string_to_lang(jm.lang);
@@ -59,18 +65,11 @@ void judgeWork<JudgeSever>::add(judgeMessage &jm){
                         jm.code
                         );
                 //3.run 里面compile
-                auto res  = jd.run([&]( judge::STATUS stat,std::string msg,
-                                        std::vector<judge::result>&& results ){
-                            this->js->addResMessage(
-                                    std::make_shared<resMessage>(jm.socket,
-                                    stat,
-                                    std::move(msg),
-                                    std::move(results) )
-                                    );
-                        });
+                auto res  = jd.run(inject);
             }
             catch( judge::judge_error & e){
-                LOG_ERROR(e.what());
+                inject(judge::STATUS::ERROR,e.what(),{});
+                LOG_INFO(e.what());
             }
             //1.前期检查
             //2.编译

@@ -65,6 +65,7 @@ enum class STATUS : int {
     ERROR,      //发生了错误
     COMPILE_ERROR, //编译失败
     COMPILE_END,   // 编译完成
+    PROBLEM_INFO, //得到了题目信息
     JUDGING,
     END
 };
