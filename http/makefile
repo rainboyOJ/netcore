@@ -1,13 +1,13 @@
 CXX =g++
 CXXFLAGS = -g -std=c++17 -DDEBUG
-INCLUDE = -I../lib -lpthread -lmysqlclient
-TARGET_SRC= $(wildcard *.cpp)
+INCLUDE = -I../lib -I../core -lpthread -lmysqlclient
+TARGET_SRC= $(wildcard ../core/*.cpp)
 TARGET_OBJ= $(patsubst %.cpp,%.o,$(TARGET_SRC))
 
 LIB_SRC=$(wildcard ../lib/*.cpp)
 LIB_OBJECT=$(patsubst %.cpp,%.o,$(LIB_SRC))
 
-server: $(LIB_OBJECT) $(TARGET_OBJ) 
+server: main.o $(LIB_OBJECT) $(TARGET_OBJ) 
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(INCLUDE)
 
 main.o: main.cpp
