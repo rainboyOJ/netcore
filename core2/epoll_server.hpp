@@ -36,6 +36,7 @@ public:
 
     ~epoll_server();
     void Start(); //启动
+    using connShrPtr = std::shared_ptr<HttpConn>;
 
 protected:
     bool InitSocket_();  //创建监听socket 并开始listen,加入到epoll里
@@ -87,8 +88,17 @@ void epoll_server<HttpConn>::__init__(
         const char* dbName, int connPoolNum, int threadNum,
         bool openLog, int logLevel, int logQueSize){
 
+    port_       = port;
+    openLinger_ = OptLinger;
+    timeoutMS_  = timeoutMS;
+    isClose_    = false;
+
+    //timer_(new HeapTimer()); TODO
+    threadpool_ = std::make_unique<ThreadPool>(threadNum);
+    epoller_ = std::make_unique<Epoller>();
+
     //TODO HttpConn init
-    SqlConnPool::Instance()->Init("localhost", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
+    SqlConnPool::Instance()->Init("127.0.0.1", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
 
     InitEventMode_(trigMode);
     if(!InitSocket_()) { isClose_ = true;}
@@ -163,15 +173,15 @@ void epoll_server<HttpConn>::Start() {
             }
             else if(events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) { //断开连接
                 assert(users_.count(fd) > 0);
-                CloseConn_(&users_[fd]);
+                CloseConn_(users_[fd].get());
             }
             else if(events & EPOLLIN) { //有数据要读取
                 assert(users_.count(fd) > 0);
-                DealRead_(&users_[fd]);
+                DealRead_(users_[fd].get());
             }
             else if(events & EPOLLOUT) {
                 assert(users_.count(fd) > 0);
-                DealWrite_(&users_[fd]);
+                DealWrite_(users_[fd].get());
             } else {
                 LOG_ERROR("Unexpected event");
             }
@@ -257,7 +267,7 @@ void epoll_server<HttpConn>::SendError_(int fd, const char*info) {
 
 template<typename HttpConn>
 void epoll_server<HttpConn>::CloseConn_(HttpConn* client) {
-    assert(client);
+    //assert(client);
     LOG_INFO("Client[%d] quit!", client->GetFd());
     epoller_->DelFd(client->GetFd());
     client->Close();
@@ -283,7 +293,7 @@ void epoll_server<HttpConn>::CloseConn_(HttpConn* client) {
 template<typename HttpConn>
 void epoll_server<HttpConn>::DealRead_(HttpConn* client) {
     assert(client);
-    ExtentTime_(client);
+    //ExtentTime_(client);
     threadpool_->AddTask(std::bind(&epoll_server<HttpConn>::OnRead_, this, client));
 }
 
@@ -291,7 +301,7 @@ void epoll_server<HttpConn>::DealRead_(HttpConn* client) {
 template<typename HttpConn>
 void epoll_server<HttpConn>::DealWrite_(HttpConn* client) {
     assert(client);
-    ExtentTime_(client);
+    //ExtentTime_(client);
     // TODO
     threadpool_->AddTask(std::bind(&epoll_server<HttpConn>::OnWrite_, this, client));
 }
@@ -308,7 +318,7 @@ void epoll_server<HttpConn>::OnRead_(HttpConn* client) {
     assert(client);
     int ret = -1;
     int readErrno = 0;
-    ret = client->read(&readErrno); //调用client的read
+    ret = client->read(&readErrno); //调用client的read,读取所有的数据
     if(ret <= 0 && readErrno != EAGAIN) {
         CloseConn_(client);
         return;

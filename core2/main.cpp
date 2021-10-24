@@ -35,6 +35,13 @@ int main(){
     htp.init(8090, 1, 100000, false, 
             3306,"root", "root", "webserver", 
             12, 6, true, 0, 1024);
+
+
+	htp.set_http_handler<GET, POST>("/", [](request& req, response& res) mutable{
+        res.set_status_and_content(status_type::ok, "hello world");
+		//res.set_status_and_content(status_type::ok, std::move(str));
+	});
+    htp.run();
     std::cout << "hello" << std::endl;
     return 0;
 }

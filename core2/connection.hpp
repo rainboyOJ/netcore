@@ -20,6 +20,8 @@
 #include "multipart_reader.hpp"
 #include "buffer.h"
 
+#define TO_EPOLL_WRITE  true
+#define TO_EPOLL_READ  false
 namespace rojcpp {
 	using http_handler        = std::function<void(request&, response&)>;
 	using send_ok_handler     = std::function<void()>;
@@ -43,7 +45,7 @@ namespace rojcpp {
         virtual bool process() = 0;
         virtual int ToWriteBytes() = 0;
 
-        bool IsKeepAlive() const { return 0; }
+        bool IsKeepAlive() const { return keep_alive_; } // TODO 
 
         static bool isET;
         //static const char* srcDir;
@@ -60,6 +62,7 @@ namespace rojcpp {
         struct iovec iov_[2];
         Buffer readBuff_; // 读缓冲区
         Buffer writeBuff_; // 写缓冲区
+        bool keep_alive_ = false;
 	};
 
 
@@ -77,18 +80,19 @@ namespace rojcpp {
 			//KEEP_ALIVE_TIMEOUT_{60*10}
 		//{}
 
-		connection(connection&& rv_conn)
-		    :MAX_REQ_SIZE_(rv_conn.MAX_REQ_SIZE_),
-            KEEP_ALIVE_TIMEOUT_(rv_conn.KEEP_ALIVE_TIMEOUT_),
-			http_handler_(rv_conn.http_handler_),
-            static_dir_(rv_conn.static_dir_),
-            upload_check_(rv_conn.upload_check_),
-            res_(std::move(rv_conn.res_)),
-		    req_(res_)
-		{}
+		// del move cotr
+		//connection(connection&& rv_conn)
+			//:MAX_REQ_SIZE_(rv_conn.MAX_REQ_SIZE_),
+            //KEEP_ALIVE_TIMEOUT_(rv_conn.KEEP_ALIVE_TIMEOUT_),
+			//http_handler_(rv_conn.http_handler_),
+            //static_dir_(rv_conn.static_dir_),
+            //upload_check_(rv_conn.upload_check_),
+            //res_(std::move(rv_conn.res_)),
+			//req_(res_)
+		//{}
 
 		explicit connection(std::size_t max_req_size, long keep_alive_timeout,
-			http_handler& handler, std::string& static_dir, std::function<bool(request& req, response& res)>* upload_check):
+			http_handler* handler, std::string& static_dir, std::function<bool(request& req, response& res)>* upload_check):
 			MAX_REQ_SIZE_(max_req_size), KEEP_ALIVE_TIMEOUT_(keep_alive_timeout),
 			http_handler_(handler), req_(res_), static_dir_(static_dir), upload_check_(upload_check)
 		{
@@ -97,7 +101,7 @@ namespace rojcpp {
 
 
         auto& socket() {
-            return socket_;
+            return fd_;
         }
 
         std::string local_address() { //本地地址
@@ -326,10 +330,14 @@ namespace rojcpp {
             close();
         }
 	private:
-		void do_read() {
-            reset();
-			async_read_some();
-		}
+		// TODO del
+        void do_read() {
+			//if(isFirstRead){
+                //reset(); // 要不要reset 呢,第一次读取时需要，其它时间不需要
+                //isFirstRead = false;
+			//}
+			////async_read_some();
+        }
 
         void reset() {
             last_transfer_ = 0;
@@ -341,32 +349,27 @@ namespace rojcpp {
 
 
 		//这个有用吗
-		inline void async_read_some() {
-			int bytes_transferred = __read_some(req_.buffer(), req_.left_size());
-			if( bytes_transferred <=0 ) close();
-			handle_read(bytes_transferred);
+		inline size_t read_work(int *saveErrno) {
 		}
 
 		//core 处理读取的数据
-		void handle_read(std::size_t bytes_transferred) { 
-			auto last_len = req_.current_size();
-			last_transfer_ = last_len;
-			bool at_capacity = req_.update_and_expand_size(bytes_transferred); //更新最大容量
-			if (at_capacity) {  //超过最大容量
-				response_back(status_type::bad_request, "The request is too long, limitation is 3M");
-				return;
-			}
+		bool handle_read(std::size_t bytes_transferred) { 
+			//auto last_len = req_.current_size();
+			//last_transfer_ = last_len;
 
 			int ret = req_.parse_header(len_); //解析头
+			update_len_(bytes_transferred); //已经处理的数据
+			req_.set_last_len(len_); //上次处理的字节长度
 
 			if (ret == parse_status::has_error) { 
 				response_back(status_type::bad_request);
-				return;
+				return TO_EPOLL_WRITE; // 进入写入
 			}
 
 			check_keep_alive();
 			if (ret == parse_status::not_complete) {
-				do_read_head(); //继续读取 头
+				//do_read_head(); //继续读取 头
+				return TO_EPOLL_READ; //继续读取
 			}
 			else {
 				auto total_len = req_.total_len();
@@ -374,22 +377,20 @@ namespace rojcpp {
 					std::string_view str(req_.data()+ len_+ total_len, 4);
 					if (str == "GET " || str == "POST") {
 						handle_pipeline(total_len, bytes_transferred); // TODO ?
-						return;
+						return true;
 					}
 				} //				if (req_.get_method() == "GET"&&http_cache::get().need_cache(req_.get_url())&&!http_cache::get().not_cache(req_.get_url())) {
 //					handle_cache();
 //					return;
 //				}
-
-				req_.set_last_len(len_); //
-				handle_request(bytes_transferred);
+				return handle_request(bytes_transferred);
 			}
 		}
 
 		//核心 
 		// 处理和各种类型的body
 		// 如果没有 body 直接 和处理头
-		void handle_request(std::size_t bytes_transferred) { //处理请求
+		bool handle_request(std::size_t bytes_transferred) { //处理请求
 			if (req_.has_body()) {
 				auto type = get_content_type();
 				req_.set_http_type(type);
@@ -413,7 +414,7 @@ namespace rojcpp {
 				}
 			}
 			else {
-				handle_header_request();
+				return handle_header_request();
 			}
 		}
 
@@ -560,9 +561,10 @@ namespace rojcpp {
 			
 			std::string& rep_str = res_.response_str();
 			if (rep_str.empty()) {
-				handle_write(int{});
+				//handle_write(int{});
 				return;
 			}
+			Writen(rep_str.data(), rep_str.size());
 
 			//cache
 //			if (req_.get_method() == "GET"&&http_cache::get().need_cache(req_.get_url()) && !http_cache::get().not_cache(req_.get_url())) {
@@ -800,8 +802,8 @@ namespace rojcpp {
 		//-------------form urlencoded----------------//
 
 		void call_back() {
-			assert(http_handler_);
-			http_handler_(req_, res_);
+            assert(http_handler_);
+			(*http_handler_)(req_, res_);
 		}
 
 		void call_back_data() {
@@ -1005,32 +1007,35 @@ namespace rojcpp {
 		}
 		//-------------multipart----------------------//
 
-		void handle_header_request() {
+        //处理 只有 headers 的情况
+		bool handle_header_request() {
 			if (is_upgrade_) { //websocket
 				req_.set_http_type(content_type::websocket);
 				//timer_.cancel();
 				//ws_.upgrade_to_websocket(req_, res_);
 				response_handshake();
-				return;
+				return TO_EPOLL_WRITE;
 			}
 
 			bool r = handle_gzip();
 			if (!r) {
 				response_back(status_type::bad_request, "gzip uncompress error");
-				return;
+				return TO_EPOLL_WRITE;
 			}
 
-			call_back(); // ?
+			call_back(); // 调用 http_router_ 其时就是route
 
 			if (req_.get_content_type() == content_type::chunked)
-				return;
+				return TO_EPOLL_WRITE;
 
 			if (req_.get_state() == data_proc_state::data_error) {
-				return;
+				return TO_EPOLL_WRITE;
 			}
 
-			if (!res_.need_delay())
-				do_write();
+			return TO_EPOLL_WRITE;
+
+			//if (!res_.need_delay())
+				//do_write();
 		}
 
 		//-------------web socket----------------//
@@ -1273,7 +1278,8 @@ namespace rojcpp {
 
 		void response_back(status_type status) {
 			res_.set_status_and_content(status);
-			do_write(); //response to client
+			disable_keep_alive();
+			//do_write(); //response to client
 		}
 
 		enum parse_status {
@@ -1361,6 +1367,16 @@ namespace rojcpp {
 		}
 		//-----------------send message----------------//
 public:
+    inline void update_len_(int ext_size){
+        len_ += ext_size;
+    }
+    inline void disable_keep_alive(){
+        keep_alive_ = false;
+    }
+    inline void enable_keep_alive(){
+        keep_alive_ = true;
+    }
+public:
 		//-----------------HttpConn function----------------//
         virtual void init(int fd, const sockaddr_in& addr) override{
             userCount++;
@@ -1369,6 +1385,7 @@ public:
             writeBuff_.RetrieveAll();
             readBuff_.RetrieveAll();
             isClose_ = false;
+            reset();
             LOG_INFO("Client[%d](%s:%d) in, userCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
@@ -1377,31 +1394,40 @@ public:
                 isClose_ = true; 
                 userCount--;
                 close(fd_);
+                req_.set_conn(this->shared_from_this()); // ?
                 LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
             }
         }
 
+        //核心 这里处理读取
         virtual ssize_t read(int* saveErrno) override { //不停的读，直到结束为止
-            ssize_t len = -1;
-            do {
-                len = readBuff_.ReadFd(fd_, saveErrno);
-                if (len <= 0) {
-                    break;
-                }
-            } while (isET);
-            return len;
+            //return pre_read_szie = read_work();
+			bool at_capacity = false;
+			int bytes_transferred = __read_all(saveErrno);
+			if( bytes_transferred <=0 and *saveErrno != EAGAIN ) {
+			    return bytes_transferred;
+			}
+
         }
 
         virtual ssize_t write(int* saveErrno) override{
-            return 1; // TODO
+            Writen(res_.response_str().c_str(), res_.response_str().size());
+            return res_.response_str().size();
         }
 
+        /*  return 
+         *      true 表示读取完毕 ,进入写入环节
+         *      false 表示读取未完全 ,下一次还是读取
+         * */
         virtual bool process() override {
-            start(); //开始读取
-            return true;
+            if (req_.at_capacity()) {  //超过最大容量
+                response_back(status_type::bad_request, "The request is too long, limitation is 3M");
+                return TO_EPOLL_WRITE;
+            }
+            return handle_read(pre_read_szie);
         }
         virtual int ToWriteBytes() override {
-            return  1;
+            return 0;
         }
 
 private:
@@ -1410,7 +1436,21 @@ private:
 
         //读取一部分数据
         inline int __read_some(char * buff_,int size){
-            return recv(socket_, buff_, size, 0);
+            return recv(fd_, buff_, size, 0);
+        }
+
+        inline int __read_all(int * saveErrno){ //读取所有能读取的数据
+            int len = 0;
+            do {
+                int siz = recv(fd_,req_.buffer(),req_.left_size(),0);
+                if( siz <=0 ){
+                    *saveErrno = errno;
+                    break;
+                }
+                len += siz; //读取的字节数
+                req_.update_and_expand_size(siz); // 更新和拓展req_的bufer
+            }while(isET);
+            return len;
         }
 
         //异步写 是写到Buff里
@@ -1433,7 +1473,7 @@ private:
             idx = 0;
             while(nLeft > 0 )
             {
-                if ( (nwritten = send(socket_, buffer + idx,nLeft,0)) <= 0) 
+                if ( (nwritten = send(fd_, buffer + idx,nLeft,0)) <= 0) 
                     return nwritten;
                 nLeft -= nwritten;
                 idx += nwritten;
@@ -1445,7 +1485,6 @@ private:
         //boost::asio::ip::tcp::socket socket_;
 		//boost::asio::steady_timer timer_;
 		
-		int socket_;
 		bool enable_timeout_ = true;
 		response res_;
 		request req_;
@@ -1473,14 +1512,15 @@ private:
 		multipart_reader multipart_parser_;
 		bool is_multi_part_file_;
 		//callback handler to application layer
-		const http_handler& http_handler_;
+		http_handler* http_handler_ = nullptr;
 		std::function<bool(request& req, response& res)>* upload_check_ = nullptr;
 		std::any tag_;
 		std::function<void(request&, std::string&)> multipart_begin_ = nullptr;
 
 		size_t len_ = 0;
+		size_t pre_read_szie = 0; //上一次读取的字节大小
 		size_t last_transfer_ = 0;  //最后转化了多少字节
-
+		bool isFirstRead{true};
 	};
 
 	inline constexpr data_proc_state ws_open = data_proc_state::data_begin;

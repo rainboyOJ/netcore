@@ -97,7 +97,7 @@ namespace rojcpp {
 			if (header_len_ <0 )
 				return header_len_;
 
-            if (!check_request()) {
+            if (!check_request()) { // TODO ?
                 return -1;
             }
 
@@ -109,13 +109,13 @@ namespace rojcpp {
 					is_chunked_ = true;
 				}
 				
-				body_len_ = 0;
+				body_len_ = 0; // body的长度设为0
 			}
 			else {
 				set_body_len(atoll(header_value.data()));
 			}
 
-			auto cookie = get_header_value("cookie");
+			auto cookie = get_header_value("cookie"); // TODO 应该去掉 
 			if (!cookie.empty()) {
 				cookie_str_ = std::string(cookie.data(), cookie.length());
 			}
@@ -197,9 +197,10 @@ namespace rojcpp {
 			return false;
 		}
 
+		// true 表示达到最大容量
 		bool update_and_expand_size(size_t size) {
 			if (update_size(size)) { //at capacity
-				return true;
+				return true; 
 			}
 
 			if (cur_size_ >= buf_.size())
@@ -259,17 +260,17 @@ namespace rojcpp {
 				file.close();
 			}
 			files_.clear();
-			is_chunked_ = false;
-			state_ = data_proc_state::data_begin;
-			part_data_ = {};
+			is_chunked_                = false;
+			state_                     = data_proc_state::data_begin;
+			part_data_                 = {};
             utf8_character_params_.clear();
             utf8_character_pathinfo_params_.clear();
             queries_.clear();
 			cookie_str_.clear();
 			form_url_map_.clear();
             multipart_form_map_.clear();
-			is_range_resource_ = false;
-			range_start_pos_ = 0;
+			is_range_resource_         = false;
+			range_start_pos_           = 0;
 			static_resource_file_size_ = 0;
 			copy_headers_.clear();
 		}

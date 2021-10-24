@@ -1,5 +1,5 @@
 CXX =g++
-CXXFLAGS = -g -std=c++17 -DDEBUG
+CXXFLAGS = -DDEBUG -g -std=c++17 -DDEBUG
 INCLUDE = -I../lib -lpthread -lmysqlclient
 #TARGET_SRC= $(wildcard ../core/*.cpp)
 #TARGET_OBJ= $(patsubst %.cpp,%.o,$(TARGET_SRC))
