@@ -96,6 +96,34 @@ namespace rojcpp {
             }
         }
 
+        void set_static_dir(std::string path) { 
+            set_file_dir(std::move(path), static_dir_);
+        }
+
+        void set_upload_dir(std::string path) {
+            set_file_dir(std::move(path), upload_dir_);
+        }
+
+        void set_file_dir(std::string&& path, std::string& dir) {
+            
+            //default: current path + "www"/"upload"
+            //"": current path
+            //"./temp", "temp" : current path + temp
+            //"/temp" : linux path; "C:/temp" : windows path
+            
+            if (path.empty()) {
+                dir = fs::current_path().string();
+                return;
+            }
+
+            if (path[0] == '/' || (path.length() >= 2 && path[1] == ':')) {
+                dir = std::move(path);
+            }
+            else {
+                dir = fs::absolute(path).string();
+            }
+        }
+
 // =========================== epoll_server 
 
     void AddClient_(int fd, sockaddr_in addr,

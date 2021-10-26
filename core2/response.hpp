@@ -75,12 +75,12 @@ namespace rojcpp {
 		void build_response_str() {
 			rep_str_.append(to_rep_string(status_));
 
-//			if (keep_alive) {
-//				rep_str_.append("Connection: keep-alive\r\n");
-//			}
-//			else {
-//				rep_str_.append("Connection: close\r\n");
-//			}
+            //if (keep_alive_) {
+                //rep_str_.append("Connection: keep-alive\r\n");
+            //}
+            //else {
+                //rep_str_.append("Connection: close\r\n");
+            //}
 
 			if (!headers_.empty()) {
 				for (auto& header : headers_) {
@@ -233,10 +233,15 @@ namespace rojcpp {
 			delay_ = false;
 			headers_.clear();
 			content_.clear();
+			keep_alive_ = false;
             //session_ = nullptr;
 
             if(cache_data.empty())
                 cache_data.clear();
+		}
+
+		void set_keep_alive(bool kal){
+		    keep_alive_ = kal;
 		}
 
 		void set_continue(bool con) {
@@ -399,6 +404,7 @@ namespace rojcpp {
 		std::chrono::system_clock::time_point last_time_ = std::chrono::system_clock::now();
 		std::string last_date_str_;
         req_content_type res_type_;
+        bool keep_alive_ = false;
         bool need_response_time_ = false;
 	};
 }

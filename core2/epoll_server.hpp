@@ -169,17 +169,21 @@ void epoll_server<HttpConn>::Start() {
             int fd = epoller_->GetEventFd(i);
             uint32_t events = epoller_->GetEvents(i);
             if(fd == listenFd_) {       //新的连接
+                LOG_INFO("new connection ,fd is %d",fd);
                 DealListen_();
             }
             else if(events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) { //断开连接
+                LOG_INFO("break connection fd %d",fd);
                 assert(users_.count(fd) > 0);
                 CloseConn_(users_[fd].get());
             }
             else if(events & EPOLLIN) { //有数据要读取
+                LOG_INFO("read connection fd %d",fd);
                 assert(users_.count(fd) > 0);
                 DealRead_(users_[fd].get());
             }
             else if(events & EPOLLOUT) {
+                LOG_INFO("write connection fd %d",fd);
                 assert(users_.count(fd) > 0);
                 DealWrite_(users_[fd].get());
             } else {
@@ -341,12 +345,13 @@ void epoll_server<HttpConn>::OnWrite_(HttpConn* client) {
     int writeErrno = 0;
     ret = client->write(&writeErrno);
     if(client->ToWriteBytes() == 0) {
-        //if( !client->writeEnd() ) { //
+        //if( client->has_continue_workd() ) { 
             //[> 继续传输 <]
-            //epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLOUT);
+            //OnProcess(client);
             //return;
         //}
         /* 传输完成 */
+        LOG_INFO("trans ok IsKeepAlive %d",client->IsKeepAlive());
         if(client->IsKeepAlive()) {
             OnProcess(client);
             return;

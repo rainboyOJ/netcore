@@ -45,7 +45,7 @@ namespace rojcpp {
         virtual bool process() = 0;
         virtual int ToWriteBytes() = 0;
 
-        bool IsKeepAlive() const { return keep_alive_; } // TODO 
+        virtual bool IsKeepAlive() const = 0;// TODO 
 
         static bool isET;
         //static const char* srcDir;
@@ -60,9 +60,8 @@ namespace rojcpp {
         bool isClose_;
         int iovCnt_; // TODO
         struct iovec iov_[2];
-        Buffer readBuff_; // 读缓冲区
-        Buffer writeBuff_; // 写缓冲区
-        bool keep_alive_ = false;
+        //Buffer readBuff_; // 读缓冲区
+        //Buffer writeBuff_; // 写缓冲区
 	};
 
 
@@ -344,13 +343,10 @@ namespace rojcpp {
             len_ = 0;
             req_.reset();
             res_.reset();
+            len_ = 0;
             reset_timer();
         }
 
-
-		//这个有用吗
-		inline size_t read_work(int *saveErrno) {
-		}
 
 		//core 处理读取的数据
 		bool handle_read(std::size_t bytes_transferred) { 
@@ -358,8 +354,20 @@ namespace rojcpp {
 			//last_transfer_ = last_len;
 
 			int ret = req_.parse_header(len_); //解析头
-			update_len_(bytes_transferred); //已经处理的数据
-			req_.set_last_len(len_); //上次处理的字节长度
+			//update_len_(bytes_transferred); //已经处理的数据
+            req_.set_last_len(len_); //上次处理的字节长度,感觉没有什么用
+			printf("parse_header  result begin ========================\n");
+			for(int i = 0 ;i < req_.num_headers_;i++){
+			    for(int j =0;j < req_.headers_[i].name_len;j++)
+			        printf("%c",req_.headers_[i].name[j]);
+			    printf(" : ");
+			    for(int j =0;j < req_.headers_[i].value_len;j++)
+			        printf("%c",req_.headers_[i].value[j]);
+			    printf("\n");
+			}
+			printf("parse_header  result end ========================\n");
+
+
 
 			if (ret == parse_status::has_error) { 
 				response_back(status_type::bad_request);
@@ -392,6 +400,11 @@ namespace rojcpp {
 		// 如果没有 body 直接 和处理头
 		bool handle_request(std::size_t bytes_transferred) { //处理请求
 			if (req_.has_body()) {
+			    // TODO check call back is having this route
+			    // {
+			    //  res_.set_respone(bad:restures."404")
+			    //  return TO_EPOLL_WRITE;
+			    // }
 				auto type = get_content_type();
 				req_.set_http_type(type);
 				switch (type) {
@@ -400,8 +413,7 @@ namespace rojcpp {
 					handle_string_body(bytes_transferred);
 					break;
 				case rojcpp::content_type::multipart:
-					handle_multipart();
-					break;
+					return handle_multipart();
 				case rojcpp::content_type::octet_stream:
 					handle_octet_stream(bytes_transferred);
 					break;
@@ -412,6 +424,7 @@ namespace rojcpp {
 					handle_chunked(bytes_transferred);
 					break;
 				}
+				return TO_EPOLL_WRITE;
 			}
 			else {
 				return handle_header_request();
@@ -816,6 +829,7 @@ namespace rojcpp {
 			    //part的开始 
 			    //on_part_begin 其时在一个part在头解析结束时候的动作
 				multipart_parser_.on_part_begin = [this](const multipart_headers & headers) {
+				    LOG_INFO("=============== on_part_begin ");
 					req_.set_multipart_headers(headers); //加头 TODO 加到req_的哪里
 					auto filename = req_.get_multipart_field_name("filename");
 					is_multi_part_file_ = req_.is_multipart_file(); //是否是文件
@@ -851,6 +865,7 @@ namespace rojcpp {
 				};
 			    //part的的数据
 				multipart_parser_.on_part_data = [this](const char* buf, size_t size) {
+				    LOG_INFO("=============== on_part_data ");
 					if (req_.get_state() == data_proc_state::data_error) {
 						return;
 					}
@@ -863,6 +878,7 @@ namespace rojcpp {
 				};
 			    //part的的结束
 				multipart_parser_.on_part_end = [this] { //这里是把文件保存下来
+				    LOG_INFO("=============== on_part_end ");
 					if (req_.get_state() == data_proc_state::data_error)
 						return;
 					if(is_multi_part_file_)
@@ -872,6 +888,7 @@ namespace rojcpp {
 						if (pfile) {
 							auto old_name = pfile->get_file_path();
 							auto pos = old_name.rfind("_ing");
+							LOG_INFO("old_name : %s",old_name.c_str());
 							if (pos != std::string::npos) {
 								pfile->rename_file(old_name.substr(0, old_name.length() - 4)); //把_ing 去掉
 							}							
@@ -913,38 +930,69 @@ namespace rojcpp {
 		}
 
 		//处理multipart
-		void handle_multipart() {
+		bool handle_multipart() {
+            LOG_INFO("=====================handle_multipart=====================");
 			if (upload_check_) {
 				bool r = (*upload_check_)(req_, res_);
 				if (!r) {
 					close();
-					return;
+				    response_back(status_type::bad_request, "upload_check_ error at line 940");
+					return TO_EPOLL_WRITE;
 				}					
 			}
 
 			bool has_error = parse_multipart(req_.header_len(), req_.current_size() - req_.header_len());
-
+            LOG_INFO("has_error %d",has_error);
 			if (has_error) {
 				response_back(status_type::bad_request, "mutipart error");
-				return;
+				return TO_EPOLL_WRITE;
 			}
 
+            LOG_INFO("req_.has_recieved_all_part() %d",req_.has_recieved_all_part());
 			if (req_.has_recieved_all_part()) {
 				call_back();
-				do_write();
+				return TO_EPOLL_WRITE;
 			}
 			else {
 				req_.set_current_size(0);
-				do_read_multipart();
+				//do_read_multipart();
+				continue_work_ = &connection::do_read_multipart;
+				return TO_EPOLL_READ;
 			}
 		}
 
 		//读multipart
-		void do_read_multipart() {
+		bool do_read_multipart() {
 			reset_timer();
 
 			req_.fit_size();
-			auto self = this->shared_from_this();
+			//auto self = this->shared_from_this();
+            //if (ec) {
+                //req_.set_state(data_proc_state::data_error);
+                //call_back();
+                //response_back(status_type::bad_request, "mutipart error");
+                //return;
+            //}
+
+            bool has_error = parse_multipart(0, last_transfer_);
+
+            if (has_error) { //parse error
+                keep_alive_ = false;
+                response_back(status_type::bad_request, "mutipart error");
+                return TO_EPOLL_WRITE;
+            }
+
+            reset_timer();
+            if (req_.body_finished()) {
+                call_back();
+                //do_write();
+                return TO_EPOLL_WRITE;
+            }
+
+            req_.set_current_size(0);
+			continue_work_ = &connection::do_read_multipart;
+			return TO_EPOLL_READ;
+
 			//TODO
 			//boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), req_.left_body_len()),
 				//[self, this](int ec, std::size_t length) {
@@ -1278,7 +1326,7 @@ namespace rojcpp {
 
 		void response_back(status_type status) {
 			res_.set_status_and_content(status);
-			disable_keep_alive();
+			//disable_keep_alive();
 			//do_write(); //response to client
 		}
 
@@ -1289,6 +1337,7 @@ namespace rojcpp {
 		};
 
 		void check_keep_alive() {
+		    return; // TODO keep_alive_
 			auto req_conn_hdr = req_.get_header_value("connection");
 			if (req_.is_http11()) {
 				keep_alive_ = req_conn_hdr.empty() || !iequal(req_conn_hdr.data(), req_conn_hdr.size(), "close");
@@ -1296,6 +1345,9 @@ namespace rojcpp {
 			else {
 				keep_alive_ = !req_conn_hdr.empty() && iequal(req_conn_hdr.data(), req_conn_hdr.size(), "keep-alive");
 			}
+
+            LOG_INFO("req_conn_hdr ",req_conn_hdr.data());
+			res_.set_keep_alive(keep_alive_);
 
 			if (keep_alive_) {
 			    // TODO
@@ -1370,22 +1422,18 @@ public:
     inline void update_len_(int ext_size){
         len_ += ext_size;
     }
-    inline void disable_keep_alive(){
-        keep_alive_ = false;
-    }
-    inline void enable_keep_alive(){
-        keep_alive_ = true;
-    }
 public:
 		//-----------------HttpConn function----------------//
         virtual void init(int fd, const sockaddr_in& addr) override{
-            userCount++;
-            addr_ = addr;
-            fd_ = fd;
-            writeBuff_.RetrieveAll();
-            readBuff_.RetrieveAll();
-            isClose_ = false;
-            reset();
+            if ( !has_continue_workd() ){ //新的
+                userCount++;
+                addr_ = addr;
+                fd_ = fd;
+                //writeBuff_.RetrieveAll();
+                //readBuff_.RetrieveAll();
+                isClose_ = false;
+                reset(); // 每一次都必须是一次完整的http请求
+            }
             LOG_INFO("Client[%d](%s:%d) in, userCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
@@ -1394,7 +1442,7 @@ public:
                 isClose_ = true; 
                 userCount--;
                 close(fd_);
-                req_.set_conn(this->shared_from_this()); // ?
+                //req_.set_conn(this->shared_from_this()); // ?
                 LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
             }
         }
@@ -1403,15 +1451,12 @@ public:
         virtual ssize_t read(int* saveErrno) override { //不停的读，直到结束为止
             //return pre_read_szie = read_work();
 			bool at_capacity = false;
-			int bytes_transferred = __read_all(saveErrno);
-			if( bytes_transferred <=0 and *saveErrno != EAGAIN ) {
-			    return bytes_transferred;
-			}
-
+			return last_transfer_ =  __read_all(saveErrno);
         }
 
         virtual ssize_t write(int* saveErrno) override{
             Writen(res_.response_str().c_str(), res_.response_str().size());
+            last_transfer_ = 0 ;
             return res_.response_str().size();
         }
 
@@ -1424,15 +1469,30 @@ public:
                 response_back(status_type::bad_request, "The request is too long, limitation is 3M");
                 return TO_EPOLL_WRITE;
             }
-            return handle_read(pre_read_szie);
+            if( last_transfer_ == 0)
+                return TO_EPOLL_READ;
+            if( !has_continue_workd() )
+                return handle_read(last_transfer_);
+            else
+                return (this->*continue_work_)();
         }
         virtual int ToWriteBytes() override {
             return 0;
         }
 
+        virtual bool IsKeepAlive() const override{
+            LOG_INFO("keep_alive_ %d\n",keep_alive_);
+            return keep_alive_;
+        }
+
+        bool has_continue_workd(){
+            return continue_work_ != nullptr;
+        }
+
 private:
 
 		//-----------------HttpConn function end----------------//
+
 
         //读取一部分数据
         inline int __read_some(char * buff_,int size){
@@ -1450,12 +1510,18 @@ private:
                 len += siz; //读取的字节数
                 req_.update_and_expand_size(siz); // 更新和拓展req_的bufer
             }while(isET);
+            //printf("read_char begin ======================= \n\n");
+            //for(auto i=req_.buf_.data(),j=i;i-j < len;i++ ){
+                //printf("%c",*i);
+            //}
+            //printf("read_char end ======================= \n\n");
+            LOG_INFO("__read_all read size %d",len);
             return len;
         }
 
         //异步写 是写到Buff里
         inline int async_write(std::string_view str){
-            writeBuff_.Append(str.data(), str.length());
+            //writeBuff_.Append(str.data(), str.length());
             return str.length();
         }
 
@@ -1518,9 +1584,10 @@ private:
 		std::function<void(request&, std::string&)> multipart_begin_ = nullptr;
 
 		size_t len_ = 0;
-		size_t pre_read_szie = 0; //上一次读取的字节大小
 		size_t last_transfer_ = 0;  //最后转化了多少字节
-		bool isFirstRead{true};
+		//bool isFirstRead{true};
+		using continue_work = bool(connection::*)();
+        continue_work continue_work_ = nullptr;
 	};
 
 	inline constexpr data_proc_state ws_open = data_proc_state::data_begin;

@@ -1,0 +1,11 @@
+keep alive 还是不对 应该只有一个socket 才对 参年 cpp11webserver
+
+keep alive 当只有返回的没有指明keeplive 的时间或次数，好像只有两次就断开了，这个可以参考cpp11webserver 来写出对应的keepalive
+
+[ ] http_server的更多处理工作
+    [x] 文件上传
+    [ ] JSON的传递，recv/send
+    [ ] conn时间最大时间
+    [ ] sql 的传递
+    [ ] cookie session 
+    [ ] 验证码

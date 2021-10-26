@@ -861,7 +861,8 @@ namespace rojcpp {
             check_headers_ = std::move(check_headers);
         }
 
-	private:
+	//private: // TODO
+	public:
 		void resize_double() {
 			size_t size = buf_.size();
 			resize(2 * size);
