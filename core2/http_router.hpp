@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <string_view>
+#include <regex>    //正则
 #include "request.hpp"
 #include "response.hpp"
 #include "utils.hpp"
@@ -20,7 +21,8 @@ namespace rojcpp { //路由用的
 	class http_router {
 	public:
 		template<http_method... Is, typename Function, typename... Ap>
-		std::enable_if_t<!std::is_member_function_pointer_v<Function>> register_handler(std::string_view name, Function&& f, const Ap&... ap) {
+		std::enable_if_t<!std::is_member_function_pointer_v<Function>> 
+		register_handler(std::string_view name, Function&& f, const Ap&... ap) {
 			if constexpr(sizeof...(Is) > 0) {
 				auto arr = get_method_arr<Is...>();
 				register_nonmember_func(name, arr, std::forward<Function>(f), ap...);
@@ -30,8 +32,25 @@ namespace rojcpp { //路由用的
 			}
 		}
 
+		template<http_method... Is, typename Function, typename... Ap>
+		void register_handler_for_regex(std::regex& name,Function&& f,const Ap&... ap){
+			if constexpr(sizeof...(Is) > 0) {
+				auto arr = get_method_arr<Is...>();
+			    this->regex_invokers_.emplace_back(name , 
+			            { arr, std::bind(&http_router::invoke<Function, Ap...>, this,
+					        std::placeholders::_1, std::placeholders::_2, std::move(f), ap...) } 
+					    );
+			}
+			else 
+			    this->regex_invokers_.emplace_back(name , 
+			            { {0}, std::bind(&http_router::invoke<Function, Ap...>, this,
+					        std::placeholders::_1, std::placeholders::_2, std::move(f), ap...) } 
+					    );
+		}
+
 		template <http_method... Is, class T, class Type, typename T1, typename... Ap>
-		std::enable_if_t<std::is_same_v<T*, T1>> register_handler(std::string_view name, Type (T::* f)(request&, response&), T1 t, const Ap&... ap) {
+		std::enable_if_t<std::is_same_v<T*, T1>> 
+		register_handler(std::string_view name, Type (T::* f)(request&, response&), T1 t, const Ap&... ap) {
 			register_handler_impl<Is...>(name, f, t, ap...);
 		}
 
@@ -45,36 +64,55 @@ namespace rojcpp { //路由用的
 		}
 
 		//elimate exception, resut type bool: true, success, false, failed
-		bool route(std::string_view method, std::string_view url, request& req, response& res) {
+		bool route(std::string_view method, std::string_view url, request& req, response& res,bool route_it = true) {
+		    //查询regex类型的 有没有
+		    for ( int i = 0;i< regex_invokers_.size();i++) {
+                auto& r = regex_invokers_[i];
+		        if(std::regex_match(std::string(url),r.first)){
+				    if (method[0] < 'A' || method[0] > 'Z')
+					    return false;
+
+				    auto& pair = r.second;
+				    if (pair.first[method[0] - 65] == 0) { // 对应的方法没有
+					    return false;
+				    }
+				    if( route_it)
+				        pair.second(req,res);
+		            return true;
+		        }
+		    }
+
 			auto it = map_invokers_.find(url);
 			if (it != map_invokers_.end()) {
 				auto& pair = it->second;
 				if (method[0] < 'A' || method[0] > 'Z')
 					return false;
 
-				if (pair.first[method[0] - 65] == 0) {
+				if (pair.first[method[0] - 65] == 0) { // 对应的方法没有
 					return false;
 				}
 
-				pair.second(req, res);
+				if( route_it )
+				    pair.second(req, res);
 				return true;
 			}
 			else {
 				if (url.rfind(DOT) != std::string_view::npos) {
-					url = STATIC_RESOURCE;
-					return route(method, url, req, res);
+					url = STATIC_RESOURCE;  // 处理静态文件
+					return route(method, url, req, res,route_it);
 				}
 
-				return get_wildcard_function(url, req, res);
+				return get_wildcard_function(url, req, res,route_it);
 			}
 		}
 
 	private:
-		bool get_wildcard_function(std::string_view key, request& req, response& res) {
+		bool get_wildcard_function(std::string_view key, request& req, response& res,bool route_it = true) {
 			for (auto& pair : wildcard_invokers_) {
-				if (key.find(pair.first) != std::string::npos) {
+				if (key.find(pair.first) != std::string::npos) { //只要能找到一部分
 					auto& t = pair.second;
-					t.second(req, res);
+					if( route_it )
+					    t.second(req, res);
 					return true;
 				}
 			}
@@ -197,6 +235,30 @@ namespace rojcpp { //路由用的
 			}, std::make_index_sequence<std::tuple_size_v<Tuple>>{});
 		}
 
+		//是否有这个url,考虑到静态文件
+		// bool 是否匹配
+		// int >=0 匹配的是哪个regex_invokers_的下标
+		// -1 匹配的不是regex_invokers_
+		auto pick(std::string_view url)-> std::pair<bool,int>
+		{
+		    //查询regex类型的 有没有
+		    for ( int i = 0;i< regex_invokers_.size();i++) {
+                auto& r = regex_invokers_[i];
+		        if(std::regex_match(std::string(url),r.first)){
+		            //TODO method
+		            return std::make_pair(true, i);
+		        }
+		    }
+
+		    auto it = map_invokers_.find(url);
+		    if( it != map_invokers_.end()){
+				auto& pair = it->second;
+		    }
+		    return {false,-1};
+		}
+
+
+
 		template<typename T, typename Tuple>
 		void do_after(T&& result, request& req, response& res, Tuple& tp) {
 			bool r = true;
@@ -212,5 +274,6 @@ namespace rojcpp { //路由用的
 		typedef std::pair<std::array<char, 26>, std::function<void(request&, response&)>> invoker_function;
 		std::map<std::string_view, invoker_function> map_invokers_;
 		std::unordered_map<std::string_view, invoker_function> wildcard_invokers_; //for url/*
+        std::vector<std::pair<std::regex,invoker_function>> regex_invokers_;
 	};
 }

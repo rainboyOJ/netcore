@@ -37,7 +37,7 @@ int main(){
             12, 6, true, 0, 1024);
 
 
-	htp.set_http_handler<GET, POST>("/", [](request& req, response& res) mutable{
+	htp.set_http_handler<GET>("/", [](request& req, response& res) mutable{
         res.set_status_and_content(status_type::ok, "hello world");
 		//res.set_status_and_content(status_type::ok, std::move(str));
 	});

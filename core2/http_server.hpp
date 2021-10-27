@@ -46,24 +46,32 @@ namespace rojcpp {
 
         void init_conn_callback() {
             //set_static_res_handler(); // TODO
-            http_handler_ = [this](request& req, response& res) { //这里初始化了 http_handler_
-                res.set_headers(req.get_headers());
+            http_handler_check_ = [this](request& req, response& res,bool route_it=false) { //这里初始化了 http_handler_
                 try {
-                    bool success = http_router_.route(req.get_method(), req.get_url(), req, res); //调用route
+                    bool success = http_router_.route(req.get_method(), req.get_url(), req, res,route_it); //调用route
                     if (!success) {
                         if (not_found_) {
                             not_found_(req, res); //调用 404
-                            return;
                         }
-                        res.set_status_and_content(status_type::bad_request, "the url is not right");
+                        else
+                            res.set_status_and_content(status_type::not_found, "404");
+                            //res.set_status_and_content(status_type::bad_request, "the url is not right");
+                        return false;
                     }
+                    return true;
                 }
                 catch (const std::exception& ex) {
                     res.set_status_and_content(status_type::internal_server_error, ex.what()+std::string(" exception in business function"));
+                    return false;
                 }
                 catch (...) {
                     res.set_status_and_content(status_type::internal_server_error, "unknown exception in business function");
+                    return false;
                 }                
+            };
+            http_handler_ = [this](request& req, response& res) { //这里初始化了 http_handler_
+                res.set_headers(req.get_headers());
+                this->http_handler_check_(req,res,true); //真正开始执行
             };
         }
 
@@ -128,13 +136,17 @@ namespace rojcpp {
 
     void AddClient_(int fd, sockaddr_in addr,
             std::size_t max_req_size, long keep_alive_timeout,
-            http_handler* handler, std::string& static_dir,
+            http_handler* handler, 
+            http_handler_check * handler_check,
+            std::string& static_dir,
             std::function<bool(request& req, response& res)>* upload_check
             ) {
         assert(fd > 0);
         if( users_.find(fd) == users_.end() ){
             users_.emplace( fd, 
-                    std::make_shared<connection>( max_req_size,keep_alive_timeout, handler,static_dir,upload_check)
+                    std::make_shared<connection>( max_req_size,keep_alive_timeout, 
+                        handler,handler_check,
+                        static_dir,upload_check)
                     );
         }
         users_[fd]->init(fd, addr); //users_ 是一个map,它会自动添加
@@ -163,6 +175,7 @@ namespace rojcpp {
                     max_req_buf_size_, //max_req_size
                     keep_alive_timeout_, //keep_alive_timeout
                     &http_handler_, // http_handler& handler
+                    &http_handler_check_, //检查是否有对应的路由
                     upload_dir_, //std::string& static_dir
                     upload_check_? &upload_check_ : nullptr // upload_check
                     );
@@ -182,6 +195,7 @@ namespace rojcpp {
 
         bool enable_timeout_ = true;
         http_handler http_handler_ = nullptr; // 被加入到connection 里,主要作用是调用router
+        http_handler_check http_handler_check_ = nullptr; //检查是否存在对应的路由
         std::function<bool(request& req, response& res)> download_check_;
         std::vector<std::string> relate_paths_;
         std::function<bool(request& req, response& res)> upload_check_ = nullptr;

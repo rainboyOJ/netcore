@@ -23,7 +23,8 @@
 #define TO_EPOLL_WRITE  true
 #define TO_EPOLL_READ  false
 namespace rojcpp {
-	using http_handler        = std::function<void(request&, response&)>;
+	using http_handler       = std::function<void(request&, response&)>;
+	using http_handler_check = std::function<bool(request&, response&,bool)>;
 	using send_ok_handler     = std::function<void()>;
 	using send_failed_handler = std::function<void(const int&)>;
 
@@ -91,9 +92,12 @@ namespace rojcpp {
 		//{}
 
 		explicit connection(std::size_t max_req_size, long keep_alive_timeout,
-			http_handler* handler, std::string& static_dir, std::function<bool(request& req, response& res)>* upload_check):
+			http_handler* handler, http_handler_check * handler_check,
+			std::string& static_dir, std::function<bool(request& req, response& res)>* upload_check)
+			:
 			MAX_REQ_SIZE_(max_req_size), KEEP_ALIVE_TIMEOUT_(keep_alive_timeout),
-			http_handler_(handler), req_(res_), static_dir_(static_dir), upload_check_(upload_check)
+			http_handler_(handler), http_handler_check_(handler_check),
+			req_(res_), static_dir_(static_dir), upload_check_(upload_check)
 		{
 			init_multipart_parser();
 		}
@@ -374,6 +378,13 @@ namespace rojcpp {
 				return TO_EPOLL_WRITE; // 进入写入
 			}
 
+			LOG_INFO("peek_route======================================");
+			if( !peek_route() ) { //找不到对应的路由
+			    LOG_INFO("peek_route======================================false" );
+			    return TO_EPOLL_WRITE;
+			}
+			    LOG_INFO("peek_route======================================true" );
+			
 			check_keep_alive();
 			if (ret == parse_status::not_complete) {
 				//do_read_head(); //继续读取 头
@@ -817,6 +828,10 @@ namespace rojcpp {
 		void call_back() {
             assert(http_handler_);
 			(*http_handler_)(req_, res_);
+		}
+		bool peek_route(){
+            assert(http_handler_check_);
+		    return (*http_handler_check_)(req_,res_,false);
 		}
 
 		void call_back_data() {
@@ -1579,6 +1594,7 @@ private:
 		bool is_multi_part_file_;
 		//callback handler to application layer
 		http_handler* http_handler_ = nullptr;
+		http_handler_check * http_handler_check_ = nullptr;
 		std::function<bool(request& req, response& res)>* upload_check_ = nullptr;
 		std::any tag_;
 		std::function<void(request&, std::string&)> multipart_begin_ = nullptr;
