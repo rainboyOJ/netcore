@@ -345,11 +345,11 @@ void epoll_server<HttpConn>::OnWrite_(HttpConn* client) {
     int writeErrno = 0;
     ret = client->write(&writeErrno);
     if(client->ToWriteBytes() == 0) {
-        //if( client->has_continue_workd() ) { 
-            //[> 继续传输 <]
-            //OnProcess(client);
-            //return;
-        //}
+        if( client->has_continue_workd() ) { 
+            /* 继续传输 */
+            OnProcess(client);
+            return;
+        }
         /* 传输完成 */
         LOG_INFO("trans ok IsKeepAlive %d",client->IsKeepAlive());
         if(client->IsKeepAlive()) {

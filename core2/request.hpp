@@ -14,7 +14,7 @@
 #include "mime_types.hpp"
 #include "response.hpp"
 namespace rojcpp {
-	enum class data_proc_state : int8_t {
+	enum class data_proc_state : int8_t { //什么用？
 		data_begin,
 		data_continue,
 		data_end,
@@ -56,7 +56,7 @@ namespace rojcpp {
             }
         }
 
-        template<typename T>
+        //template<typename T>
         std::shared_ptr<connection> get_conn() {
             //static_assert(std::is_same_v<T, cinatra::SSL> || std::is_same_v<T, cinatra::NonSSL>, "invalid socket type, must be SSL or NonSSL");
             if (conn_.expired())

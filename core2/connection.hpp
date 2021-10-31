@@ -204,21 +204,25 @@ namespace rojcpp {
 		//============ web socket ============
 
 		void write_chunked_header(std::string_view mime,bool is_range=false) {
-			req_.set_http_type(content_type::chunked);
+			req_.set_http_type(content_type::chunked); //设置内容为 chunked
 			reset_timer();
 			if(!is_range){
                 chunked_header_ = http_chunk_header + "Content-Type: " + std::string(mime.data(), mime.length()) + "\r\n\r\n";
 			}else{
                 chunked_header_ = http_range_chunk_header + "Content-Type: " + std::string(mime.data(), mime.length()) + "\r\n\r\n";
             }
+            LOG_INFO("========= connection write_chunked_header == ");
+            std::cout << chunked_header_ << std::endl;
             //异步 TODO async_write
 			//boost::asio::async_write(socket(),
 				//boost::asio::buffer(chunked_header_),
 				//[self = this->shared_from_this()](const int& ec, std::size_t bytes_transferred) {
 				//self->handle_chunked_header(ec);
 			//});
-			async_write(chunked_header_);
-			handle_chunked_header(0);
+			res_.response_str() = std::move(chunked_header_);
+			req_.set_state(data_proc_state::data_continue); //设置data_continue
+			//continue_work_ = &connection::handle_chunked_header; //设置下一个任务
+			continue_work_ = &connection::continue_write_then_route;
 		}
 
         //写一个 ranges 头 TODO ？
@@ -232,45 +236,26 @@ namespace rojcpp {
 				//handle_chunked_header(ec);
 			//});
 			async_write(chunked_header_);
-			handle_chunked_header(0);
+			//handle_chunked_header(0);
         }
 
 		//写数据 chunk_data
 		void write_chunked_data(std::string&& buf, bool eof) {
 			reset_timer();
 
-			std::vector<boost::asio::const_buffer> buffers = res_.to_chunked_buffers(buf.data(), buf.length(), eof);
-			if (buffers.empty()) {
-				handle_write(int{});
-				return;
-			}
-
-			//auto self = this->shared_from_this();
-            // TODO async_write
-			//boost::asio::async_write(socket(), buffers, [this, self, buf = std::move(buf), eof](const int& ec, size_t) {
-				//if (ec) {
-					//return;
-				//}
-
-				//if (eof) {
-					//req_.set_state(data_proc_state::data_end);
-				//}
-				//else {
-					//req_.set_state(data_proc_state::data_continue);
-				//}
-
-				//call_back();
-			//});
-			for (const auto& e : buffers) {
-			    async_write(e);
-			}
+			//std::vector<boost::asio::const_buffer> buffers = res_.to_chunked_buffers(buf.data(), buf.length(), eof);
+			//if (buf.empty()) { //关闭
+				//handle_write(int{}); // TODO ?
+				//return;
+			//}
+			res_.response_str() = res_.to_chunked_buffers(buf.data(),buf.length() , eof);
             if (eof) {
-                req_.set_state(data_proc_state::data_end);
+                req_.set_state(data_proc_state::data_end); //data_end 应该如何做呢
             }
             else {
                 req_.set_state(data_proc_state::data_continue);
             }
-            call_back();
+            //call_back(); //路由
 		}
 
         // TODO 什么是 ranges_data
@@ -1088,7 +1073,7 @@ namespace rojcpp {
 
 			call_back(); // 调用 http_router_ 其时就是route
 
-			if (req_.get_content_type() == content_type::chunked)
+			if (req_.get_content_type() == content_type::chunked) //这里
 				return TO_EPOLL_WRITE;
 
 			if (req_.get_state() == data_proc_state::data_error) {
@@ -1283,13 +1268,12 @@ namespace rojcpp {
 			}
 		}
 
-		void handle_chunked_header(const int& ec) {
-			if (ec) {
-				return;
-			}
+		bool continue_write_then_route(){
+			call_back();// 去route
+			return TO_EPOLL_WRITE;
+		}
 
-			req_.set_state(data_proc_state::data_continue);
-			call_back();//app set the data
+		bool handle_chunked_header() {
 		}
 		//-------------chunked(read chunked not support yet, write chunked is ok)----------------------//
 
@@ -1469,8 +1453,9 @@ public:
 			return last_transfer_ =  __read_all(saveErrno);
         }
 
+        //如果想要断续写， saveErrno = EAGAIN ret < 0 to_wirte_byte !=0
         virtual ssize_t write(int* saveErrno) override{
-            Writen(res_.response_str().c_str(), res_.response_str().size());
+            Writen(res_.response_str().c_str(), res_.response_str().size()); //每一次写在rep_str_里
             last_transfer_ = 0 ;
             return res_.response_str().size();
         }
@@ -1484,8 +1469,8 @@ public:
                 response_back(status_type::bad_request, "The request is too long, limitation is 3M");
                 return TO_EPOLL_WRITE;
             }
-            if( last_transfer_ == 0)
-                return TO_EPOLL_READ;
+            //if( last_transfer_ == 0) //暂时不以这个作为写或读的标准
+                //return TO_EPOLL_READ;
             if( !has_continue_workd() )
                 return handle_read(last_transfer_);
             else
@@ -1502,6 +1487,10 @@ public:
 
         bool has_continue_workd(){
             return continue_work_ != nullptr;
+        }
+
+        void clear_continue_workd(){
+            continue_work_ = nullptr;
         }
 
 private:

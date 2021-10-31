@@ -9,3 +9,12 @@ keep alive 当只有返回的没有指明keeplive 的时间或次数，好像只
     [ ] sql 的传递
     [ ] cookie session 
     [ ] 验证码
+need_cache 的作用是什么？
+
+[ ] 图片 不使用直接使用硬盘 直接存在内存里
+
+
+[] 把图片上传到sm.ms 
+[] 写一个类来封装sm.ms 
+用sm.ms [如何将图床作为图片上传的接口（sm.ms版，postman演示）_butcher的博客-CSDN博客_图床上传接口](https://blog.csdn.net/weixin_46827107/article/details/120036848)
+

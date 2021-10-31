@@ -95,7 +95,7 @@ namespace rojcpp {
             if(res_type_!= req_content_type::none){
                 rep_str_.append(get_content_type(res_type_));
             }
-            rep_str_.append("Server: cinatra\r\n");
+            rep_str_.append("Server: rojcpp\r\n");
 			//if (session_ != nullptr && session_->is_need_update()) {
 				//auto cookie_str = session_->get_cookie().to_string();
 				//rep_str_.append("Set-Cookie: ").append(cookie_str).append("\r\n");
@@ -264,27 +264,27 @@ namespace rojcpp {
 
 
 		//转成chunked buffer
-		std::vector<boost::asio::const_buffer> to_chunked_buffers(const char* chunk_data, size_t length, bool eof) {
-			std::vector<boost::asio::const_buffer> buffers;
+        std::string to_chunked_buffers(const char* chunk_data, size_t length, bool eof) {
+			std::string buffers_;
 
 			if (length > 0) {
 				// convert bytes transferred count to a hex string.
 				chunk_size_ = to_hex_string(length);
 
 				// Construct chunk based on rfc2616 section 3.6.1
-				buffers.push_back(boost::asio::buffer(chunk_size_));
-				buffers.push_back(boost::asio::buffer(crlf));
-				buffers.push_back(boost::asio::buffer(chunk_data, length));
-				buffers.push_back(boost::asio::buffer(crlf));
+				buffers_.append(chunk_size_);
+				buffers_.append(crlf);
+				buffers_.append(std::string(chunk_data, length));
+				buffers_.append(crlf);
 			}
 
 			//append last-chunk
 			if (eof) {
-				buffers.push_back(boost::asio::buffer(last_chunk));
-				buffers.push_back(boost::asio::buffer(crlf));
+				buffers_.append(last_chunk);
+				buffers_.append(crlf);
 			}
 
-			return buffers;
+			return buffers_;
 		}
 
         //// TODO session 相关

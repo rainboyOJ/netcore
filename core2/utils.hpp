@@ -197,13 +197,14 @@ namespace rojcpp {
 		OPTIONS,
 		TRACE
 	};
-	constexpr inline auto GET = http_method::GET;
-	constexpr inline auto POST = http_method::POST;
-	constexpr inline auto DEL = http_method::DEL;
-	constexpr inline auto HEAD = http_method::HEAD;
-	constexpr inline auto PUT = http_method::PUT;
+
+	constexpr inline auto GET     = http_method::GET;
+	constexpr inline auto POST    = http_method::POST;
+	constexpr inline auto DEL     = http_method::DEL;
+	constexpr inline auto HEAD    = http_method::HEAD;
+	constexpr inline auto PUT     = http_method::PUT;
 	constexpr inline auto CONNECT = http_method::CONNECT;
-	constexpr inline auto TRACE = http_method::TRACE;
+	constexpr inline auto TRACE   = http_method::TRACE;
 	constexpr inline auto OPTIONS = http_method::OPTIONS;
 
     enum class transfer_type {

@@ -44,8 +44,26 @@ namespace rojcpp {
             init_conn_callback(); //初始化 连接的回掉函数 http_handler_ ,static_res_hander 静态资源hander
         }
 
+
+        template<typename T>
+        bool need_cache(T&& t) { //需要cache ?
+            if constexpr(std::is_same_v<T, enable_cache<bool>>) {
+                return t.value;
+            }
+            else {
+                return false;
+            }
+        }
+
+        std::string get_send_data(request& req, const size_t len) ;
+        void write_chunked_header(request& req, std::shared_ptr<std::ifstream> in, std::string_view mime);
+        void write_chunked_body(request& req) ;
+        void write_ranges_header(request& req, std::string_view mime, std::string filename, std::string file_size) ;
+        void write_ranges_data(request& req) ;
+        void set_static_res_handler();
+
         void init_conn_callback() {
-            //set_static_res_handler(); // TODO
+            set_static_res_handler();
             http_handler_check_ = [this](request& req, response& res,bool route_it=false) { //这里初始化了 http_handler_
                 try {
                     bool success = http_router_.route(req.get_method(), req.get_url(), req, res,route_it); //调用route
@@ -148,6 +166,7 @@ namespace rojcpp {
                         handler,handler_check,
                         static_dir,upload_check)
                     );
+            users_[fd]->start(); // 设置conn_指向自己
         }
         users_[fd]->init(fd, addr); //users_ 是一个map,它会自动添加
         if(timeoutMS_ > 0) {
@@ -196,7 +215,7 @@ namespace rojcpp {
         bool enable_timeout_ = true;
         http_handler http_handler_ = nullptr; // 被加入到connection 里,主要作用是调用router
         http_handler_check http_handler_check_ = nullptr; //检查是否存在对应的路由
-        std::function<bool(request& req, response& res)> download_check_;
+        std::function<bool(request& req, response& res)> download_check_ = nullptr;
         std::vector<std::string> relate_paths_;
         std::function<bool(request& req, response& res)> upload_check_ = nullptr;
 
@@ -216,4 +235,148 @@ namespace rojcpp {
 
     //using http_server = http_server_proxy<NonSSL>;
     //using http_ssl_server = http_server_proxy<SSL>;
+ 
+        //静态资源hander
+        void http_server_::set_static_res_handler()
+        {
+            set_http_handler<POST,GET>(STATIC_RESOURCE, [this](request& req, response& res){
+                if (download_check_) { // 如果有
+                    bool r = download_check_(req, res);
+                    if (!r) {
+                        res.set_status_and_content(status_type::bad_request);
+                        return;
+                    }                        
+                }
+
+                auto state = req.get_state(); // TODO 这个state的作用是什么 ?
+                switch (state) {
+                    case rojcpp::data_proc_state::data_begin:
+                    {
+                        std::string relative_file_name = req.get_relative_filename();
+                        std::string fullpath = static_dir_ + relative_file_name;
+
+                        auto mime = req.get_mime(relative_file_name);
+                        auto in = std::make_shared<std::ifstream>(fullpath, std::ios_base::binary);
+                        if (!in->is_open()) {
+                            if (not_found_) {
+                                not_found_(req, res);
+                                return;
+                            }
+                            res.set_status_and_content(status_type::not_found,"");
+                            return;
+                        }
+                        auto start = req.get_header_value("cinatra_start_pos"); //设置读取的文件的位置
+                        if (!start.empty()) {
+                            std::string start_str(start);
+                            int64_t start = (int64_t)atoll(start_str.data());
+                            std::error_code code;
+                            int64_t file_size = fs::file_size(fullpath, code);
+                            if (start > 0 && !code && file_size >= start) {
+                                in->seekg(start);
+                            }
+                        }
+                        
+                        req.get_conn()->set_tag(in); // tag变成in
+                        
+                        //if(is_small_file(in.get(),req)){
+                        //    send_small_file(res, in.get(), mime);
+                        //    return;
+                        //}
+
+                        if(transfer_type_== transfer_type::CHUNKED)
+                            write_chunked_header(req, in, mime); //调用的是这个
+                        else
+                            write_ranges_header(req, mime, fs::path(relative_file_name).filename().string(), std::to_string(fs::file_size(fullpath)));
+                    }
+                        break;
+                    case rojcpp::data_proc_state::data_continue:
+                    {
+                        if (transfer_type_ == transfer_type::CHUNKED)
+                            write_chunked_body(req);
+                        else
+                            write_ranges_data(req);
+                    }
+                        break;
+                    case rojcpp::data_proc_state::data_end:
+                    {
+                        auto conn = req.get_conn();
+                        conn->clear_continue_workd(); // 结束
+                    }
+                        break;
+                    case rojcpp::data_proc_state::data_error:
+                    {
+                        //network error
+                    }
+                        break;
+                }
+            },enable_cache{false});
+        }
+
+
+        void http_server_::write_chunked_header(request& req, std::shared_ptr<std::ifstream> in, std::string_view mime) {
+            auto range_header = req.get_header_value("range");
+            req.set_range_flag(!range_header.empty()); //分块发送
+            req.set_range_start_pos(range_header);
+
+            std::string res_content_header = std::string(mime.data(), mime.size()) + "; charset=utf8";
+            res_content_header += std::string("\r\n") + std::string("Access-Control-Allow-origin: *");
+            res_content_header += std::string("\r\n") + std::string("Accept-Ranges: bytes");
+            if (static_res_cache_max_age_>0)
+            {
+                std::string max_age = std::string("max-age=") + std::to_string(static_res_cache_max_age_);
+                res_content_header += std::string("\r\n") + std::string("Cache-Control: ") + max_age;
+            }
+            
+            if(req.is_range())
+            {
+                std::int64_t file_pos  = req.get_range_start_pos();
+                in->seekg(file_pos);
+                auto end_str = std::to_string(req.get_request_static_file_size());
+                res_content_header += std::string("\r\n") +std::string("Content-Range: bytes ")+std::to_string(file_pos)+std::string("-")+std::to_string(req.get_request_static_file_size()-1)+std::string("/")+end_str;
+            }
+            //高用了connection的 write_chunked_header
+            req.get_conn()->write_chunked_header(std::string_view(res_content_header),req.is_range());
+        }
+
+        std::string http_server_::get_send_data(request& req, const size_t len) {
+            auto conn = req.get_conn();
+            auto in = std::any_cast<std::shared_ptr<std::ifstream>>(conn->get_tag());
+            std::string str;
+            str.resize(len);
+            in->read(&str[0], len);
+            size_t read_len = (size_t)in->gcount();
+            if (read_len != len) {
+                str.resize(read_len);
+            }
+            return str;
+        }
+
+        void http_server_::write_chunked_body(request& req) {
+            const size_t len = 3 * 1024 * 1024;
+            auto str = get_send_data(req, len); //得到发送的数据
+            auto read_len = str.size();
+            bool eof = (read_len == 0 || read_len != len);
+            req.get_conn()->write_chunked_data(std::move(str), eof);
+        }
+
+
+        void http_server_::write_ranges_header(request& req, std::string_view mime, std::string filename, std::string file_size) {
+            std::string header_str = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-origin: *\r\nAccept-Ranges: bytes\r\n";
+            header_str.append("Content-Disposition: attachment;filename=");
+            header_str.append(std::move(filename)).append("\r\n");
+            header_str.append("Connection: keep-alive\r\n");
+            header_str.append("Content-Type: ").append(mime).append("\r\n");
+            header_str.append("Content-Length: ");
+            header_str.append(file_size).append("\r\n\r\n");
+            req.get_conn()->write_ranges_header(std::move(header_str));
+        }
+
+        void http_server_::write_ranges_data(request& req) {
+            const size_t len = 3 * 1024 * 1024;
+            auto str = get_send_data(req, len);
+            auto read_len = str.size();
+            bool eof = (read_len == 0 || read_len != len);
+            req.get_conn()->write_ranges_data(std::move(str), eof);
+        }
+
 }
