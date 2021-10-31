@@ -2,31 +2,31 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 namespace rojcpp {
-	enum class content_type {
-		string,
-		multipart,
-		urlencoded,
-		chunked,
-		octet_stream,
-		websocket,
-		unknown,
-	};
+    enum class content_type {
+        string,
+        multipart,
+        urlencoded,
+        chunked,
+        octet_stream,
+        websocket,
+        unknown,
+    };
 
-	enum class req_content_type{
-		html,
-		json,
-		string,
-		multipart,
+    enum class req_content_type{
+        html,
+        json,
+        string,
+        multipart,
         none
-	};
+    };
 
-	constexpr inline auto HTML = req_content_type::html;
-	constexpr inline auto JSON = req_content_type::json;
-	constexpr inline auto TEXT = req_content_type::string;
-	constexpr inline auto NONE = req_content_type::none;
+    constexpr inline auto HTML = req_content_type::html;
+    constexpr inline auto JSON = req_content_type::json;
+    constexpr inline auto TEXT = req_content_type::string;
+    constexpr inline auto NONE = req_content_type::none;
 
-	inline const std::string_view STATIC_RESOURCE = "cinatra_static_resource";
-	inline const std::string CSESSIONID = "CSESSIONID";
+    inline const std::string_view STATIC_RESOURCE = "cinatra_static_resource";
+    inline const std::string CSESSIONID = "CSESSIONID";
 
     const static inline std::string CRCF = "\r\n";
     const static inline std::string TWO_CRCF = "\r\n\r\n";

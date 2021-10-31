@@ -38,16 +38,16 @@ namespace dec_ {
     // https://www.facebook.com/notes/facebook-engineering/
     //         three-optimization-tips-for-c/10151361643253920/
 
-	template < typename T, size_t N, typename Gen, size_t... Is >
-	constexpr auto generate_array(Gen&& item, std::index_sequence<Is...>)
-	{
-		return std::array<T, N>{ {item(Is)...}};
-	}
+    template < typename T, size_t N, typename Gen, size_t... Is >
+    constexpr auto generate_array(Gen&& item, std::index_sequence<Is...>)
+    {
+        return std::array<T, N>{ {item(Is)...}};
+    }
 
-	const std::array<char, 200>
-		digits = generate_array<char, 200>([](size_t i) {
-		return char('0' + ((i % 2) ? ((i / 2) % 10) : ((i / 2) / 10)));
-	}, std::make_index_sequence<200>{});
+    const std::array<char, 200>
+        digits = generate_array<char, 200>([](size_t i) {
+        return char('0' + ((i % 2) ? ((i / 2) % 10) : ((i / 2) / 10)));
+    }, std::make_index_sequence<200>{});
 
  //   extern const std::array<char,200> digits;
     static inline uint16_t const& dd(uint8_t u) {
@@ -215,7 +215,7 @@ namespace dec_ {
         template<typename U,
             std::enable_if_t<! std::is_signed<U>::value
                 && std::is_integral<U>::value>* = nullptr>
-		static inline char* itoa( U u, char* p )
+        static inline char* itoa( U u, char* p )
         {
             return convert<D>::template itoa(p,u);
         }
@@ -224,7 +224,7 @@ namespace dec_ {
         template<typename I, size_t N=sizeof(I),
             std::enable_if_t<std::is_signed<I>::value
                 && std::is_integral<I>::value>* = nullptr>
-		static inline char* itoa( I i, char* p )
+        static inline char* itoa( I i, char* p )
         {
             // Need "mask" to be filled with a copy of the sign bit.
             // If "i" is a negative value, then the result of "operator >>"

@@ -37,17 +37,17 @@ int main(){
             12, 6, true, 0, 1024);
 
 
-	htp.set_http_handler<GET>("/", [](request& req, response& res) mutable{
+    htp.set_http_handler<GET>("/", [](request& req, response& res) mutable{
         res.set_status_and_content(status_type::ok, "hello world");
-		//res.set_status_and_content(status_type::ok, std::move(str));
-	});
+        //res.set_status_and_content(status_type::ok, std::move(str));
+    });
 
-	htp.set_http_handler<POST>("/upload", [](request& req, response& res) mutable{
-	        std::cout << req.get_file()->get_file_path() << std::endl;
-	        std::cout << req.get_file()->get_file_size() << std::endl;
+    htp.set_http_handler<POST>("/upload", [](request& req, response& res) mutable{
+            std::cout << req.get_file()->get_file_path() << std::endl;
+            std::cout << req.get_file()->get_file_size() << std::endl;
         res.set_status_and_content(status_type::ok, "hello world");
-		//res.set_status_and_content(status_type::ok, std::move(str));
-	});
+        //res.set_status_and_content(status_type::ok, std::move(str));
+    });
     htp.run();
     std::cout << "hello" << std::endl;
     return 0;
