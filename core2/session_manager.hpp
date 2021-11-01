@@ -4,16 +4,29 @@
 
 #ifndef CINATRA_SESSION_UTILS_HPP
 #define CINATRA_SESSION_UTILS_HPP
+#pragma once
+#include <thread>
 #include "session.hpp"
 #include "request.hpp"
 namespace rojcpp {
     class session_manager {
     public:
-        static session_manager& get() {
+        static session_manager& get() { //单例模式
             static session_manager instance;
             return instance;
         }
 
+        /**
+        * 创建session
+        *
+        * @param name 名字
+        * @param expire 过期时间
+        * @param path 路径
+        * @domain 域名
+        *
+        * @return shared_ptr<session>
+        *
+        */
         std::shared_ptr<session> create_session(const std::string& name, std::size_t expire, 
             const std::string& path = "/", const std::string& domain = ""){
             auto tp = std::chrono::high_resolution_clock::now();

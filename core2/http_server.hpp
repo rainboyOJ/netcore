@@ -13,8 +13,10 @@
 //#include "function_traits.hpp"
 //#include "url_encode_decode.hpp"
 #include "http_cache.hpp"
+#include "timer.hpp" //定时器
 //#include "session_manager.hpp"
 //#include "cookie.hpp"
+
 
 namespace rojcpp {
     
@@ -42,6 +44,8 @@ namespace rojcpp {
             __init__(port, trigMode, timeoutMS, OptLinger, sqlPort, sqlUser, sqlPwd, dbName, connPoolNum, threadNum, openLog, logLevel, logQueSize);
             http_cache::get().set_cache_max_age(86400); // 最大的cache时间
             init_conn_callback(); //初始化 连接的回掉函数 http_handler_ ,static_res_hander 静态资源hander
+            //定时器
+            epoller_->AddFd(Timer::getInstance()->getfd0(), EPOLLIN );
         }
 
 
@@ -97,6 +101,63 @@ namespace rojcpp {
             //init_dir(static_dir_); //初始化 路径 ?
             //init_dir(upload_dir_);
             Start(); //TODO call father class 进入循环
+        }
+
+        virtual void Start() override {
+            int timeMS = -1;  /* epoll wait timeout == -1 无事件将阻塞 */
+            if(!isClose_) { LOG_INFO("========== Server start =========="); }
+            while(!isClose_) {
+                if(timeoutMS_ > 0) {
+                    //timeMS = timer_->GetNextTick(); //TODO
+                }
+                int eventCnt = epoller_->Wait(timeMS);
+                for(int i = 0; i < eventCnt; i++) {
+                    /* 处理事件 */
+                    int fd = epoller_->GetEventFd(i);
+                    uint32_t events = epoller_->GetEvents(i);
+                    if(fd == listenFd_) {       //新的连接
+                        LOG_INFO("new connection ,fd is %d",fd);
+                        DealListen_();
+                    }
+                    else if ((fd == Timer::getInstance()->getfd0()) && (events & EPOLLIN))
+                    {
+                        //bool flag = dealwithsignal(timeout, stop_server);
+                        std::cout << "dealwithsignal==================" << std::endl;
+
+                        char signals[1024];
+                        int ret = recv(Timer::getInstance()->getfd0(), signals, sizeof(signals), 0);
+                        std::cout << "ret " << ret << std::endl;
+                        std::cout << (int)signals[0] << std::endl;
+                        alarm(5);
+                        //epoller_->ModFd(Timer::get->GetFd(), connEvent_ | EPOLLIN);
+                        //if (false == flag)
+                            //LOG_ERROR("%s", "dealclientdata failure");
+                    }
+                    else if(events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) { //断开连接
+                        LOG_INFO("break connection fd %d",fd);
+                        assert(users_.count(fd) > 0);
+                        CloseConn_(users_[fd].get());
+                    }
+                    else if(events & EPOLLIN) { //有数据要读取
+                        LOG_INFO("read connection fd %d",fd);
+                        assert(users_.count(fd) > 0);
+                        DealRead_(users_[fd].get());
+                    }
+                    else if(events & EPOLLOUT) {
+                        LOG_INFO("write connection fd %d",fd);
+                        assert(users_.count(fd) > 0);
+                        DealWrite_(users_[fd].get());
+                    } else {
+                        LOG_ERROR("Unexpected event");
+                    }
+                }
+            }
+        }
+
+        //处理定时任务
+        void deal_timer(){
+            //connection 的超时
+            //session_manager的超时
         }
 
         //set http handlers
@@ -228,6 +289,7 @@ namespace rojcpp {
 
         transfer_type transfer_type_ = transfer_type::CHUNKED;
         bool need_response_time_ = false;
+
     };
 
     //template<typename T>

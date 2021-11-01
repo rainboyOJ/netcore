@@ -35,7 +35,7 @@ public:
             );
 
     ~epoll_server();
-    void Start(); //启动
+    virtual void Start() = 0; //启动
     using connShrPtr = std::shared_ptr<HttpConn>;
 
 protected:
@@ -155,43 +155,6 @@ void epoll_server<HttpConn>::InitEventMode_(int trigMode) {
     //HttpConn::isET = (connEvent_ & EPOLLET); // TODO
 }
 
-template<typename HttpConn>
-void epoll_server<HttpConn>::Start() {
-    int timeMS = -1;  /* epoll wait timeout == -1 无事件将阻塞 */
-    if(!isClose_) { LOG_INFO("========== Server start =========="); }
-    while(!isClose_) {
-        if(timeoutMS_ > 0) {
-            //timeMS = timer_->GetNextTick(); //TODO
-        }
-        int eventCnt = epoller_->Wait(timeMS);
-        for(int i = 0; i < eventCnt; i++) {
-            /* 处理事件 */
-            int fd = epoller_->GetEventFd(i);
-            uint32_t events = epoller_->GetEvents(i);
-            if(fd == listenFd_) {       //新的连接
-                LOG_INFO("new connection ,fd is %d",fd);
-                DealListen_();
-            }
-            else if(events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) { //断开连接
-                LOG_INFO("break connection fd %d",fd);
-                assert(users_.count(fd) > 0);
-                CloseConn_(users_[fd].get());
-            }
-            else if(events & EPOLLIN) { //有数据要读取
-                LOG_INFO("read connection fd %d",fd);
-                assert(users_.count(fd) > 0);
-                DealRead_(users_[fd].get());
-            }
-            else if(events & EPOLLOUT) {
-                LOG_INFO("write connection fd %d",fd);
-                assert(users_.count(fd) > 0);
-                DealWrite_(users_[fd].get());
-            } else {
-                LOG_ERROR("Unexpected event");
-            }
-        }
-    }
-}
 
 template<typename HttpConn>
 bool epoll_server<HttpConn>::InitSocket_() {

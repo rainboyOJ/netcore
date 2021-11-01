@@ -6,9 +6,8 @@ namespace rojcpp {
     class cookie {
     public:
         cookie() = default;
-        cookie(const std::string& name, const std::string& value) : name_(name), value_(value) {
-
-        }
+        cookie(const std::string& name, const std::string& value)
+            : name_(name), value_(value) {}
 
         void set_version(int version) {
             version_ = version;
@@ -136,15 +135,15 @@ namespace rojcpp {
         }
 
     private:
-        int          version_ = 0;
-        std::string  name_ = "";
-        std::string  value_ = "";
-        std::string  comment_ = "";
-        std::string  domain_ = "";
-        std::string  path_ = "";
-        std::string  priority_ = "";
-        bool         secure_ = false;
-        std::time_t  max_age_ = -1;
+        int          version_   = 0;
+        std::string  name_      = "";
+        std::string  value_     = "";
+        std::string  comment_   = "";
+        std::string  domain_    = "";
+        std::string  path_      = "";
+        std::string  priority_  = "";
+        bool         secure_    = false;
+        std::time_t  max_age_   = -1;
         bool         http_only_ = false;
     };
 }
