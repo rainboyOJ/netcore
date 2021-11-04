@@ -130,7 +130,7 @@ namespace rojcpp {
                         threadpool_->AddTask(
                                 std::bind(&http_server_::deal_sigal , this,int(signals[0]))
                                 );
-                        alarm(5);
+                        alarm(5000); //5000s 检查一次
                         //epoller_->ModFd(Timer::get->GetFd(), connEvent_ | EPOLLIN);
                         //if (false == flag)
                             //LOG_ERROR("%s", "dealclientdata failure");
@@ -248,10 +248,10 @@ namespace rojcpp {
         }
         users_[fd]->init(fd, addr); //users_ 是一个map,它会自动添加
         if( timeoutMS_ > 0) //加入heap里
-            //timer_->add(fd, timeoutMS_, std::bind(&http_server_::CloseConn_, this, users_[fd].get()));
-            timer_->add(fd, timeoutMS_, [this,fd](){
-                    LOG_INFO("================ timer_ close");
-                    });
+            timer_->add(fd, timeoutMS_, std::bind(&http_server_::CloseConn_, this, users_[fd].get()));
+            //timer_->add(fd, timeoutMS_, [this,fd](){
+                    //LOG_INFO("================ timer_ close");
+                    //});
         epoller_->AddFd(fd, EPOLLIN | connEvent_);
         SetFdNonblock(fd);
         LOG_INFO("Client[%d] in!", users_[fd]->GetFd());
