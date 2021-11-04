@@ -25,8 +25,7 @@
 namespace rojcpp {
     using http_handler       = std::function<void(request&, response&)>;
     using http_handler_check = std::function<bool(request&, response&,bool)>;
-    using send_ok_handler     = std::function<void()>;
-    using send_failed_handler = std::function<void(const int&)>;
+    using send_ok_handler     = std::function<void()>; using send_failed_handler = std::function<void(const int&)>;
 
     class base_connection {
     public:
@@ -58,9 +57,9 @@ namespace rojcpp {
 
         int fd_;
         struct  sockaddr_in addr_;
-        bool isClose_;
-        int iovCnt_; // TODO
-        struct iovec iov_[2];
+        //bool isClose_;
+        //int iovCnt_; // TODO
+        //struct iovec iov_[2];
         //Buffer readBuff_; // 读缓冲区
         //Buffer writeBuff_; // 写缓冲区
     };
@@ -70,27 +69,7 @@ namespace rojcpp {
     class connection : 
         public HttpConn,private noncopyable ,public std::enable_shared_from_this<connection>
     {
-    private:
-
     public:
-        //connection() :
-            //req_(res_)
-        //{}
-            //MAX_REQ_SIZE_{3*1024*1024},
-            //KEEP_ALIVE_TIMEOUT_{60*10}
-        //{}
-
-        // del move cotr
-        //connection(connection&& rv_conn)
-            //:MAX_REQ_SIZE_(rv_conn.MAX_REQ_SIZE_),
-            //KEEP_ALIVE_TIMEOUT_(rv_conn.KEEP_ALIVE_TIMEOUT_),
-            //http_handler_(rv_conn.http_handler_),
-            //static_dir_(rv_conn.static_dir_),
-            //upload_check_(rv_conn.upload_check_),
-            //res_(std::move(rv_conn.res_)),
-            //req_(res_)
-        //{}
-
         explicit connection(std::size_t max_req_size, long keep_alive_timeout,
             http_handler* handler, http_handler_check * handler_check,
             std::string& static_dir, std::function<bool(request& req, response& res)>* upload_check)
@@ -134,11 +113,6 @@ namespace rojcpp {
             return {std::move(ip), std::move(port)};
         }
 
-        void start() {          //开始
-            req_.set_conn(this->shared_from_this()); // ?
-            do_read();  //读取
-        }
-
         const std::string& static_dir() {
             return static_dir_;
         }
@@ -152,23 +126,8 @@ namespace rojcpp {
         void on_close() {
             keep_alive_ = false;
             req_.set_state(data_proc_state::data_error);
-            close();
-        }
-
-        void reset_timer() {
-            if (!enable_timeout_)
-                return;
-            //TODO fix
-        }
-
-        void cancel_timer() {
-            if (!enable_timeout_)
-                return;
-            // TODO fix
-        }
-
-        void enable_timeout(bool enable) {
-            enable_timeout_ = enable;
+            //connection_close();
+            Close();
         }
 
         void set_tag(std::any&& tag) { // TODO tag 有什么用？
@@ -205,29 +164,20 @@ namespace rojcpp {
 
         void write_chunked_header(std::string_view mime,bool is_range=false) {
             req_.set_http_type(content_type::chunked); //设置内容为 chunked
-            reset_timer();
             if(!is_range){
                 chunked_header_ = http_chunk_header + "Content-Type: " + std::string(mime.data(), mime.length()) + "\r\n\r\n";
             }else{
                 chunked_header_ = http_range_chunk_header + "Content-Type: " + std::string(mime.data(), mime.length()) + "\r\n\r\n";
             }
             LOG_INFO("========= connection write_chunked_header == ");
-            std::cout << chunked_header_ << std::endl;
-            //异步 TODO async_write
-            //boost::asio::async_write(socket(),
-                //boost::asio::buffer(chunked_header_),
-                //[self = this->shared_from_this()](const int& ec, std::size_t bytes_transferred) {
-                //self->handle_chunked_header(ec);
-            //});
             res_.response_str() = std::move(chunked_header_);
             req_.set_state(data_proc_state::data_continue); //设置data_continue
-            //continue_work_ = &connection::handle_chunked_header; //设置下一个任务
+            //设置下一个任务
             continue_work_ = &connection::continue_write_then_route;
         }
 
         //写一个 ranges 头 TODO ？
         void write_ranges_header(std::string header_str) {
-            reset_timer();
             chunked_header_ = std::move(header_str); //reuse the variable
             //TODO async_write
             //boost::asio::async_write(socket(),
@@ -241,8 +191,6 @@ namespace rojcpp {
 
         //写数据 chunk_data
         void write_chunked_data(std::string&& buf, bool eof) {
-            reset_timer();
-
             //std::vector<boost::asio::const_buffer> buffers = res_.to_chunked_buffers(buf.data(), buf.length(), eof);
             //if (buf.empty()) { //关闭
                 //handle_write(int{}); // TODO ?
@@ -260,8 +208,6 @@ namespace rojcpp {
 
         // TODO 什么是 ranges_data
         void write_ranges_data(std::string&& buf, bool eof) {
-            reset_timer();
-
             chunked_header_ = std::move(buf); //reuse the variable
             auto self = this->shared_from_this();
             // TODO async_write
@@ -315,7 +261,7 @@ namespace rojcpp {
         }
 
         virtual ~connection() override {
-            close();
+            Close();
         }
     private:
         // TODO del
@@ -333,7 +279,6 @@ namespace rojcpp {
             req_.reset();
             res_.reset();
             len_ = 0;
-            reset_timer();
         }
 
 
@@ -530,7 +475,6 @@ namespace rojcpp {
 
         //读取头
         void do_read_head() {
-            reset_timer();
             int bytes_transferred =  __read_some(req_.buffer(), req_.left_size());
             handle_read(bytes_transferred);
             //socket().async_read_some(boost::asio::buffer(req_.buffer(), req_.left_size()),
@@ -540,8 +484,6 @@ namespace rojcpp {
 
         //读取body
         void do_read_body() {
-            reset_timer();
-
             auto self = this->shared_from_this();
             // TODO do read_some
             //boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), req_.left_body_len()),
@@ -566,7 +508,6 @@ namespace rojcpp {
 
         //写 回应
         void do_write() {
-            reset_timer();
             
             std::string& rep_str = res_.response_str();
             if (rep_str.empty()) {
@@ -599,9 +540,8 @@ namespace rojcpp {
             }
             else {
                 reset();
-                cancel_timer(); //avoid close two times
                 shutdown();
-                close();
+                Close();
             }
         }
 
@@ -634,26 +574,6 @@ namespace rojcpp {
             }
 
             return content_type::unknown;
-        }
-
-        void close(bool close_ssl = true) {
-#ifdef rojcpp_ENABLE_SSL
-            if (close_ssl && ssl_stream_) {
-                int ec;
-                ssl_stream_->shutdown(ec);
-                ssl_stream_ = nullptr;
-            }
-#endif
-            if (has_closed_) {
-                return;
-            }
-
-            req_.close_upload_file();
-            shutdown();
-            int ec;
-            //socket_.close(ec);
-            has_closed_ = true;
-            has_shake_ = false;
         }
 
         /****************** begin handle http body data *****************/
@@ -785,7 +705,6 @@ namespace rojcpp {
         }
 
         void do_read_form_urlencoded() {
-            reset_timer();
 
             auto self = this->shared_from_this();
             // TODO
@@ -935,7 +854,7 @@ namespace rojcpp {
             if (upload_check_) {
                 bool r = (*upload_check_)(req_, res_);
                 if (!r) {
-                    close();
+                    Close();
                     response_back(status_type::bad_request, "upload_check_ error at line 940");
                     return TO_EPOLL_WRITE;
                 }                    
@@ -963,7 +882,6 @@ namespace rojcpp {
 
         //读multipart
         bool do_read_multipart() {
-            reset_timer();
 
             req_.fit_size();
             //auto self = this->shared_from_this();
@@ -983,7 +901,6 @@ namespace rojcpp {
                 return TO_EPOLL_WRITE;
             }
 
-            reset_timer();
             if (req_.body_finished()) {
                 call_back();
                 clear_continue_workd();
@@ -1062,7 +979,7 @@ namespace rojcpp {
         void response_handshake() {
             std::vector<boost::asio::const_buffer> buffers = res_.to_buffers();
             if (buffers.empty()) {
-                close();
+                Close();
                 return;
             }
 
@@ -1397,25 +1314,31 @@ public:
         //-----------------HttpConn function----------------//
         virtual void init(int fd, const sockaddr_in& addr) override{
             if ( !has_continue_workd() ){ //新的
+                req_.set_conn(this->shared_from_this()); // ?
                 userCount++;
                 addr_ = addr;
                 fd_ = fd;
                 //writeBuff_.RetrieveAll();
                 //readBuff_.RetrieveAll();
-                isClose_ = false;
+                has_closed_ = false;
                 reset(); // 每一次都必须是一次完整的http请求
             }
             LOG_INFO("Client[%d](%s:%d) in, userCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
+        //关闭
         virtual void Close() override{
-            if(isClose_ == false){
-                isClose_ = true; 
-                userCount--;
-                close(fd_);
-                //req_.set_conn(this->shared_from_this()); // ?
-                LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
+            if (has_closed_) {
+                return;
             }
+            //reset(); //这里不reset 因为关闭的时间reset可能会导致失败 TODO
+            req_.close_upload_file();
+            has_closed_ = true;
+            has_shake_ = false;
+            continue_work_ = nullptr;
+            userCount--;
+            close(fd_);
+            LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
         //核心 这里处理读取
@@ -1537,8 +1460,7 @@ private:
         const long KEEP_ALIVE_TIMEOUT_{60*10};
         std::string& static_dir_;
         bool has_shake_ = false;
-        //std::atomic_bool has_closed_ = false;
-        bool has_closed_ = false;
+        //bool has_closed_ = false;
 
         //for writing message
         std::mutex buffers_mtx_;
@@ -1565,10 +1487,12 @@ private:
         //bool isFirstRead{true};
         using continue_work = bool(connection::*)();
         continue_work continue_work_ = nullptr;
+
+        std::atomic_bool has_closed_ = false;
     };
 
-    inline constexpr data_proc_state ws_open = data_proc_state::data_begin;
+    inline constexpr data_proc_state ws_open    = data_proc_state::data_begin;
+    inline constexpr data_proc_state ws_close   = data_proc_state::data_close;
+    inline constexpr data_proc_state ws_error   = data_proc_state::data_error;
     inline constexpr data_proc_state ws_message = data_proc_state::data_continue;
-    inline constexpr data_proc_state ws_close = data_proc_state::data_close;
-    inline constexpr data_proc_state ws_error = data_proc_state::data_error;
 }

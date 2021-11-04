@@ -14,8 +14,9 @@
 //#include "url_encode_decode.hpp"
 #include "http_cache.hpp"
 #include "timer.hpp" //定时器
-//#include "session_manager.hpp"
-//#include "cookie.hpp"
+#include "session_manager.hpp"
+#include "cookie.hpp"
+#include "heaptimer.hpp"
 
 
 namespace rojcpp {
@@ -108,7 +109,7 @@ namespace rojcpp {
             if(!isClose_) { LOG_INFO("========== Server start =========="); }
             while(!isClose_) {
                 if(timeoutMS_ > 0) {
-                    //timeMS = timer_->GetNextTick(); //TODO
+                    timeMS = timer_->GetNextTick(); //TODO 这个timeMS 有什么用
                 }
                 int eventCnt = epoller_->Wait(timeMS);
                 for(int i = 0; i < eventCnt; i++) {
@@ -126,8 +127,9 @@ namespace rojcpp {
 
                         char signals[1024];
                         int ret = recv(Timer::getInstance()->getfd0(), signals, sizeof(signals), 0);
-                        std::cout << "ret " << ret << std::endl;
-                        std::cout << (int)signals[0] << std::endl;
+                        threadpool_->AddTask(
+                                std::bind(&http_server_::deal_sigal , this,int(signals[0]))
+                                );
                         alarm(5);
                         //epoller_->ModFd(Timer::get->GetFd(), connEvent_ | EPOLLIN);
                         //if (false == flag)
@@ -158,6 +160,14 @@ namespace rojcpp {
         void deal_timer(){
             //connection 的超时
             //session_manager的超时
+        }
+
+        void deal_sigal(int sig){
+            //LOG_INFO("deal_sigal signal = %d\n",sig);
+            if( sig == SIGALRM) { // 
+                //LOG_INFO("deal_sigal SIGALRM");
+                session_manager::get().check_expire(); //检查session
+            }
         }
 
         //set http handlers
@@ -221,18 +231,27 @@ namespace rojcpp {
             std::function<bool(request& req, response& res)>* upload_check
             ) {
         assert(fd > 0);
+        //auto [iter,inserted] =  users_.try_emplace(fd,
+                //std::make_shared<connection>( max_req_size,keep_alive_timeout, 
+                    //handler,handler_check,
+                    //static_dir,upload_check)
+                //);
+        //if(inserted )
+            //iter->second->start();
         if( users_.find(fd) == users_.end() ){
             users_.emplace( fd, 
                     std::make_shared<connection>( max_req_size,keep_alive_timeout, 
                         handler,handler_check,
                         static_dir,upload_check)
                     );
-            users_[fd]->start(); // 设置conn_指向自己
+            //users_[fd]->start(); // 设置conn_指向自己
         }
         users_[fd]->init(fd, addr); //users_ 是一个map,它会自动添加
-        if(timeoutMS_ > 0) {
-            //timer_->add(fd, timeoutMS_, std::bind(&WebServer::CloseConn_, this, &users_[fd]));
-        }
+        if( timeoutMS_ > 0) //加入heap里
+            //timer_->add(fd, timeoutMS_, std::bind(&http_server_::CloseConn_, this, users_[fd].get()));
+            timer_->add(fd, timeoutMS_, [this,fd](){
+                    LOG_INFO("================ timer_ close");
+                    });
         epoller_->AddFd(fd, EPOLLIN | connEvent_);
         SetFdNonblock(fd);
         LOG_INFO("Client[%d] in!", users_[fd]->GetFd());
@@ -289,6 +308,7 @@ namespace rojcpp {
 
         transfer_type transfer_type_ = transfer_type::CHUNKED;
         bool need_response_time_ = false;
+
 
     };
 

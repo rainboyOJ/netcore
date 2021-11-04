@@ -22,7 +22,7 @@ namespace rojcpp {
         * @param name 名字
         * @param expire 过期时间
         * @param path 路径
-        * @domain 域名
+        * @param domain 域名
         *
         * @return shared_ptr<session>
         *

@@ -15,17 +15,13 @@
 #include "threadpool.h"
 #include "sqlconnpool.h"
 #include "epoller.hpp"
+#include "heaptimer.hpp"
 
 namespace rojcpp {
     
 template<typename HttpConn>
 class epoll_server {
 public:
-    //epoll_server(
-        //int port, int trigMode, int timeoutMS, bool OptLinger, 
-        //int sqlPort, const char* sqlUser, const  char* sqlPwd, 
-        //const char* dbName, int connPoolNum, int threadNum,
-        //bool openLog, int logLevel, int logQueSize);
     epoll_server()=default;
     void __init__(
         int port, int trigMode, int timeoutMS, bool OptLinger, 
@@ -74,7 +70,7 @@ protected:
     uint32_t listenEvent_;
     uint32_t connEvent_;
    
-    //std::unique_ptr<HeapTimer> timer_;
+    std::unique_ptr<HeapTimer> timer_;
     std::unique_ptr<ThreadPool> threadpool_;
     std::unique_ptr<Epoller> epoller_;
     std::unordered_map<int, std::shared_ptr<HttpConn> > users_;
@@ -93,9 +89,9 @@ void epoll_server<HttpConn>::__init__(
     timeoutMS_  = timeoutMS;
     isClose_    = false;
 
-    //timer_(new HeapTimer()); TODO
+    timer_      = std::make_unique<HeapTimer>(); 
     threadpool_ = std::make_unique<ThreadPool>(threadNum);
-    epoller_ = std::make_unique<Epoller>();
+    epoller_    = std::make_unique<Epoller>();
 
     //TODO HttpConn init
     SqlConnPool::Instance()->Init("127.0.0.1", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
@@ -260,7 +256,7 @@ void epoll_server<HttpConn>::CloseConn_(HttpConn* client) {
 template<typename HttpConn>
 void epoll_server<HttpConn>::DealRead_(HttpConn* client) {
     assert(client);
-    //ExtentTime_(client);
+    ExtentTime_(client);
     threadpool_->AddTask(std::bind(&epoll_server<HttpConn>::OnRead_, this, client));
 }
 
@@ -268,16 +264,16 @@ void epoll_server<HttpConn>::DealRead_(HttpConn* client) {
 template<typename HttpConn>
 void epoll_server<HttpConn>::DealWrite_(HttpConn* client) {
     assert(client);
-    //ExtentTime_(client);
+    ExtentTime_(client);
     // TODO
     threadpool_->AddTask(std::bind(&epoll_server<HttpConn>::OnWrite_, this, client));
 }
 
-//template<typename HttpConn>
-//void epoll_server<HttpConn>::ExtentTime_(HttpConn* client) {
-    //assert(client);
-    //if(timeoutMS_ > 0) { timer_->adjust(client->GetFd(), timeoutMS_); }
-//}
+template<typename HttpConn>
+void epoll_server<HttpConn>::ExtentTime_(HttpConn* client) {
+    assert(client);
+    if(timeoutMS_ > 0) { timer_->adjust(client->GetFd(), timeoutMS_); }
+}
 
 
 template<typename HttpConn>
@@ -293,6 +289,7 @@ void epoll_server<HttpConn>::OnRead_(HttpConn* client) {
     OnProcess(client);
 }
 
+//这样保证了只有一个线程在同一个fd上工作
 template<typename HttpConn>
 void epoll_server<HttpConn>::OnProcess(HttpConn* client) {
     if(client->process()) {

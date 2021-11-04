@@ -8,8 +8,8 @@
 #endif
 #include "define.h"
 #include "upload_file.hpp"
-//#include "session.hpp"
-//#include "session_manager.hpp"
+#include "session.hpp"
+#include "session_manager.hpp"
 #include "url_encode_decode.hpp"
 #include "mime_types.hpp"
 #include "response.hpp"
@@ -772,23 +772,23 @@ namespace rojcpp {
             return cookies;
         }
 
-        //std::weak_ptr<session> get_session(const std::string& name)
-        //{
-            //auto cookies = get_cookies();
-            //auto iter = cookies.find(name);
-            //std::weak_ptr<session> ref;
-            //if(iter!=cookies.end())
-            //{
-                //ref = session_manager::get().get_session(std::string(iter->second.data(), iter->second.length()));
-            //}
-            //res_.set_session(ref);
-            //return ref;
-        //}
+        std::weak_ptr<session> get_session(const std::string& name)
+        {
+            auto cookies = get_cookies();
+            auto iter = cookies.find(name);
+            std::weak_ptr<session> ref;
+            if(iter!=cookies.end())
+            {
+                ref = session_manager::get().get_session(std::string(iter->second.data(), iter->second.length()));
+            }
+            res_.set_session(ref);
+            return ref;
+        }
 
-        //std::weak_ptr<session> get_session()
-        //{
-            //return get_session(CSESSIONID);
-        //}
+        std::weak_ptr<session> get_session()
+        {
+            return get_session(CSESSIONID);
+        }
 
         void set_range_flag(bool flag)
         {

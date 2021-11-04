@@ -32,12 +32,26 @@ int main(){
             //nullptr
             //);
     http_server_ htp;
-    htp.init(8090, 1, 100000, false, 
+    htp.init(8090, 1, 100000, false,  // 100s 的等待时间
             3306,"root", "root", "webserver", 
             12, 6, true, 0, 1024);
 
 
     htp.set_http_handler<GET>("/", [](request& req, response& res) mutable{
+        res.set_status_and_content(status_type::ok, "hello world");
+        //res.set_status_and_content(status_type::ok, std::move(str));
+    });
+
+    htp.set_http_handler<GET>("/session", [](request& req, response& res) mutable{
+        if( req.get_session().expired() ){ //过期没有
+            std::cout << "没有 session" << std::endl;
+        }
+        else {
+            std::cout << "=========== 有 session" << std::endl;
+        }
+        res.start_session();
+        res.session()->set_data("login", true);
+
         res.set_status_and_content(status_type::ok, "hello world");
         //res.set_status_and_content(status_type::ok, std::move(str));
     });

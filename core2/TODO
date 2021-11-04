@@ -6,6 +6,8 @@ keep alive 当只有返回的没有指明keeplive 的时间或次数，好像只
     [x] 文件上传
     [x] 静态文件托管（最好每个文件不要超过3M，当然这个参数可以改）
     [ ] cookie session 
+    [ ] url_code
+    [ ] web socket
     [ ] JSON的传递，recv/send
     [ ] conn时间最大时间
     [ ] sql 的传递
