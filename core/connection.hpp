@@ -351,8 +351,7 @@ namespace rojcpp {
                 switch (type) {
                 case rojcpp::content_type::string:
                 case rojcpp::content_type::unknown:
-                    handle_string_body(bytes_transferred);
-                    break;
+                    return handle_string_body(bytes_transferred);
                 case rojcpp::content_type::multipart:
                     return handle_multipart();
                 case rojcpp::content_type::octet_stream:
@@ -577,11 +576,11 @@ namespace rojcpp {
         }
 
         /****************** begin handle http body data *****************/
-        void handle_string_body(std::size_t bytes_transferred) {
+        bool handle_string_body(std::size_t bytes_transferred) {
             //defalt add limitation for string_body and else. you can remove the limitation for very big string.
             if (req_.at_capacity()) {
                 response_back(status_type::bad_request, "The request is too long, limitation is 3M");
-                return;
+                return TO_EPOLL_WRITE;
             }
 
             if (req_.has_recieved_all()) {
@@ -593,10 +592,11 @@ namespace rojcpp {
                 size_t part_size = req_.current_size() - req_.header_len();
                 if (part_size == -1) {
                     response_back(status_type::internal_server_error);
-                    return;
+                    return TO_EPOLL_WRITE;
                 }
                 req_.reduce_left_body_size(part_size);
                 do_read_body();
+                return TO_EPOLL_READ;
             }
         }
 
@@ -1166,37 +1166,38 @@ namespace rojcpp {
         }
         //-------------chunked(read chunked not support yet, write chunked is ok)----------------------//
 
-        void handle_body() {
+        bool handle_body() {
             if (req_.at_capacity()) {
                 response_back(status_type::bad_request, "The body is too long, limitation is 3M");
-                return;
+                return TO_EPOLL_WRITE;
             }
 
             bool r = handle_gzip();
             if (!r) {
                 response_back(status_type::bad_request, "gzip uncompress error");
-                return;
+                return TO_EPOLL_WRITE;
             }
 
             if (req_.get_content_type() == content_type::multipart) {
                 bool has_error = parse_multipart(req_.header_len(), req_.current_size() - req_.header_len());
                 if (has_error) {
                     response_back(status_type::bad_request, "mutipart error");
-                    return;
+                    return TO_EPOLL_WRITE;
                 }
-                do_write();
-                return;
+                //do_write();
+                return TO_EPOLL_WRITE; // ? 这里是写吗
             }
 
             if (req_.body_len()>0&&!req_.check_request()) {
                 response_back(status_type::bad_request, "request check error");
-                return;
+                return TO_EPOLL_WRITE;
             }
 
             call_back(); //调用handler_request_
+            return TO_EPOLL_WRITE;
 
-            if (!res_.need_delay()) //不需要延迟，直接写 TODO 改成write_ EPOLLOUT 事件
-                do_write();
+            //if (!res_.need_delay()) //不需要延迟，直接写 TODO 改成write_ EPOLLOUT 事件
+                //do_write();
         }
 
         bool handle_gzip() {

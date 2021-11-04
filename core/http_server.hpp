@@ -14,9 +14,12 @@
 //#include "url_encode_decode.hpp"
 #include "http_cache.hpp"
 #include "timer.hpp" //定时器
+#include "heaptimer.hpp"
+
+#ifdef __USE_SESSION__
 #include "session_manager.hpp"
 #include "cookie.hpp"
-#include "heaptimer.hpp"
+#endif
 
 
 namespace rojcpp {
@@ -123,7 +126,6 @@ namespace rojcpp {
                     else if ((fd == Timer::getInstance()->getfd0()) && (events & EPOLLIN))
                     {
                         //bool flag = dealwithsignal(timeout, stop_server);
-                        std::cout << "dealwithsignal==================" << std::endl;
 
                         char signals[1024];
                         int ret = recv(Timer::getInstance()->getfd0(), signals, sizeof(signals), 0);
@@ -166,7 +168,7 @@ namespace rojcpp {
             //LOG_INFO("deal_sigal signal = %d\n",sig);
             if( sig == SIGALRM) { // 
                 //LOG_INFO("deal_sigal SIGALRM");
-                session_manager::get().check_expire(); //检查session
+                //session_manager::get().check_expire(); //检查session
             }
         }
 

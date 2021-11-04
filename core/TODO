@@ -5,13 +5,16 @@ keep alive 当只有返回的没有指明keeplive 的时间或次数，好像只
 [ ] http_server的更多处理工作
     [x] 文件上传
     [x] 静态文件托管（最好每个文件不要超过3M，当然这个参数可以改）
-    [ ] cookie session 
-    [ ] url_code
+    [x] cookie session 
+     [ ] 把session 去掉 使用 jwt
+    [ ] jwt
+    [x] JSON的传递，recv/send 就是 string 类型
+    [ ] url_code TODO
     [ ] web socket
-    [ ] JSON的传递，recv/send
-    [ ] conn时间最大时间
+    [x] conn时间最大时间
     [ ] sql 的传递
-    [ ] 验证码
+    [ ] 验证码 自己写一个验证码
+    [ ] 梳理整个connection
 need_cache 的作用是什么？
 
 [ ] 图片 不使用直接使用硬盘 直接存在内存里

@@ -56,6 +56,11 @@ int main(){
         //res.set_status_and_content(status_type::ok, std::move(str));
     });
 
+    //json
+    htp.set_http_handler<POST>("/json", [](request& req, response& res) mutable{
+        res.set_status_and_content(status_type::ok, "{\"hello\":1}",req_content_type::json);
+    });
+
     htp.set_http_handler<POST>("/upload", [](request& req, response& res) mutable{
             std::cout << req.get_file()->get_file_path() << std::endl;
             std::cout << req.get_file()->get_file_size() << std::endl;
