@@ -47,9 +47,9 @@ namespace rojcpp {
 
         virtual bool IsKeepAlive() const = 0;// TODO 
 
-        static bool isET;
+        bool isET{true};
         //static const char* srcDir;
-        static std::atomic<int> userCount;
+        std::atomic<int> userCount{0};
 
         virtual ~HttpConn() override {}
 
