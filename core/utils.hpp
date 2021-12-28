@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <map>
 #include <iostream>
+#include <atomic>
+#include <thread>
 #include "define.h"
 
 namespace rojcpp {
@@ -709,6 +711,16 @@ namespace rojcpp {
     template<typename T, typename... Args>
     inline auto filter(Args&&... args) {
         return filter_helper<T>::func(std::forward<Args>(args)...);
+    }
+
+    inline auto uuid_str(){
+        static std::atomic_int64_t id_ = 0;
+        auto tp = std::chrono::high_resolution_clock::now();
+        auto nano = tp.time_since_epoch().count();
+        //auto pid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+        id_++;
+        //std::string uuid_str = std::to_string(nano) + std::to_string(id_);
+        return std::to_string(nano) + std::to_string(id_);
     }
 }
 
