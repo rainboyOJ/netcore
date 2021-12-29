@@ -42,19 +42,19 @@ int main(){
         //res.set_status_and_content(status_type::ok, std::move(str));
     });
 
-    htp.set_http_handler<GET>("/session", [](request& req, response& res) mutable{
-        if( req.get_session().expired() ){ //过期没有
-            std::cout << "没有 session" << std::endl;
-        }
-        else {
-            std::cout << "=========== 有 session" << std::endl;
-        }
-        res.start_session();
-        res.session()->set_data("login", true);
+    //htp.set_http_handler<GET>("/session", [](request& req, response& res) mutable{
+        //if( req.get_session().expired() ){ //过期没有
+            //std::cout << "没有 session" << std::endl;
+        //}
+        //else {
+            //std::cout << "=========== 有 session" << std::endl;
+        //}
+        //res.start_session();
+        //res.session()->set_data("login", true);
 
-        res.set_status_and_content(status_type::ok, "hello world");
-        //res.set_status_and_content(status_type::ok, std::move(str));
-    });
+        //res.set_status_and_content(status_type::ok, "hello world");
+        ////res.set_status_and_content(status_type::ok, std::move(str));
+    //});
 
     //json
     htp.set_http_handler<POST>("/json", [](request& req, response& res) mutable{

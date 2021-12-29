@@ -241,7 +241,7 @@ namespace rojcpp {
             headers_.clear();
             content_.clear();
             keep_alive_ = false;
-            session_ = nullptr;
+            //session_ = nullptr;
 
             if(cache_data.empty())
                 cache_data.clear();

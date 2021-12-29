@@ -49,7 +49,7 @@ namespace rojcpp {
 
         bool isET{true};
         //static const char* srcDir;
-        std::atomic<int> userCount{0};
+        static std::atomic<int> userCount;
 
         virtual ~HttpConn() override {}
 
