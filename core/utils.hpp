@@ -413,6 +413,7 @@ namespace rojcpp {
         return ret;
     }
 
+    //是否是 url_encode
     inline bool is_form_url_encode(std::string_view str) {
         return str.find("%") != std::string_view::npos || str.find("+") != std::string_view::npos;
     }

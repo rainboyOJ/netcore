@@ -9,7 +9,7 @@
 #include <vector>
 #include <errno.h>
 
-class Epoller {
+class Epoller { //封装epoll的常用操作
 public:
     explicit Epoller(int maxEvent = 1024);
 

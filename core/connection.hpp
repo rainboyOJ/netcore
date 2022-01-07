@@ -23,9 +23,12 @@
 #define TO_EPOLL_WRITE  true
 #define TO_EPOLL_READ  false
 namespace rojcpp {
-    using http_handler       = std::function<void(request&, response&)>;
-    using http_handler_check = std::function<bool(request&, response&,bool)>;
-    using send_ok_handler     = std::function<void()>; using send_failed_handler = std::function<void(const int&)>;
+
+    using http_handler        = std::function<void(request&, response&)>;
+    using http_handler_check  = std::function<bool(request&, response&,bool)>;
+    using send_ok_handler     = std::function<void()>;
+    using send_failed_handler = std::function<void(const int&)>;
+    using upload_check_handler= std::function<bool(request& req, response& res)>;
 
     class base_connection {
     public:
@@ -34,51 +37,50 @@ namespace rojcpp {
 
     class HttpConn :public base_connection {
     public:
+        // 初始化
         virtual void init(int sockFd, const sockaddr_in& addr) = 0;
-        virtual ssize_t read(int* saveErrno) =0;
-        virtual ssize_t write(int* saveErrno) =0 ;
-        virtual void Close() =0;
+        virtual ssize_t read(int* saveErrno) =0;        //读取数据
+        virtual ssize_t write(int* saveErrno)=0;        //写入数据
+        virtual void Close() =0;                        //关闭连接
         int GetFd() const { return fd_;}
         int GetPort() const { return addr_.sin_port; }
         const char* GetIP() const{ return inet_ntoa(addr_.sin_addr); }
         sockaddr_in GetAddr() const{ return addr_; }
-        virtual bool process() = 0;
+        virtual bool process() = 0;                     //对数据进行处理
         virtual int ToWriteBytes() = 0;
 
         virtual bool IsKeepAlive() const = 0;// TODO 
 
         bool isET{true};
         //static const char* srcDir;
-        static std::atomic<int> userCount;
+        static std::atomic<int> userCount; // 统计有少个用户连接
 
         virtual ~HttpConn() override {}
 
     protected:
-
         int fd_;
         struct  sockaddr_in addr_;
-        //bool isClose_;
-        //int iovCnt_; // TODO
-        //struct iovec iov_[2];
-        //Buffer readBuff_; // 读缓冲区
-        //Buffer writeBuff_; // 写缓冲区
     };
 
 
     using SocketType = int;
-    class connection : 
-        public HttpConn,private noncopyable ,public std::enable_shared_from_this<connection>
+    class connection : public HttpConn,private noncopyable ,public std::enable_shared_from_this<connection>
     {
     public:
-        explicit connection(std::size_t max_req_size, long keep_alive_timeout,
-            http_handler* handler, http_handler_check * handler_check,
-            std::string& static_dir, std::function<bool(request& req, response& res)>* upload_check)
+        explicit connection(
+                std::size_t max_req_size,
+                long keep_alive_timeout,
+                http_handler* handler,      //http_handler  的函数指针
+                http_handler_check * handler_check, // http_handler_check 的函数指针
+                std::string& static_dir,    //静态资源目录
+                upload_check_handler * upload_check //上传查询
+            )
             :
             MAX_REQ_SIZE_(max_req_size), KEEP_ALIVE_TIMEOUT_(keep_alive_timeout),
             http_handler_(handler), http_handler_check_(handler_check),
             req_(res_), static_dir_(static_dir), upload_check_(upload_check)
         {
-            init_multipart_parser();
+            init_multipart_parser(); //初始化 multipart 解析器
         }
 
 
@@ -171,9 +173,9 @@ namespace rojcpp {
             }
             LOG_INFO("========= connection write_chunked_header == ");
             res_.response_str() = std::move(chunked_header_);
-            req_.set_state(data_proc_state::data_continue); //设置data_continue
+            req_.set_state(data_proc_state::data_continue); //设置data_continue 会读取req的
             //设置下一个任务
-            continue_work_ = &connection::continue_write_then_route;
+            continue_work_ = &connection::continue_write_then_route; //
         }
 
         //写一个 ranges 头 TODO ？
@@ -206,7 +208,7 @@ namespace rojcpp {
             //call_back(); //路由
         }
 
-        // TODO 什么是 ranges_data
+        // TODO 什么是 ranges_data 文件的一个区间
         void write_ranges_data(std::string&& buf, bool eof) {
             chunked_header_ = std::move(buf); //reuse the variable
             auto self = this->shared_from_this();
@@ -278,7 +280,6 @@ namespace rojcpp {
             len_ = 0;
             req_.reset();
             res_.reset();
-            len_ = 0;
         }
 
 
@@ -287,20 +288,18 @@ namespace rojcpp {
             //auto last_len = req_.current_size();
             //last_transfer_ = last_len;
 
-            int ret = req_.parse_header(len_); //解析头
-            //update_len_(bytes_transferred); //已经处理的数据
-            req_.set_last_len(len_); //上次处理的字节长度,感觉没有什么用
-            printf("parse_header  result begin ========================\n");
-            for(int i = 0 ;i < req_.num_headers_;i++){
-                for(int j =0;j < req_.headers_[i].name_len;j++)
-                    printf("%c",req_.headers_[i].name[j]);
-                printf(" : ");
-                for(int j =0;j < req_.headers_[i].value_len;j++)
-                    printf("%c",req_.headers_[i].value[j]);
-                printf("\n");
-            }
-            printf("parse_header  result end ========================\n");
-
+            int ret = req_.parse_header_expand_last_len(last_transfer_); //解析头
+            update_len_(last_transfer_); //已经处理的数据
+            //printf("parse_header  result begin ========================\n");
+            //for(int i = 0 ;i < req_.num_headers_;i++){
+            //    for(int j =0;j < req_.headers_[i].name_len;j++)
+            //        printf("%c",req_.headers_[i].name[j]);
+            //    printf(" : ");
+            //    for(int j =0;j < req_.headers_[i].value_len;j++)
+            //        printf("%c",req_.headers_[i].value[j]);
+            //    printf("\n");
+            //}
+            //printf("parse_header  result end ========================\n");
 
 
             if (ret == parse_status::has_error) { 
@@ -338,7 +337,7 @@ namespace rojcpp {
 
         //核心 
         // 处理和各种类型的body
-        // 如果没有 body 直接 和处理头
+        // 如果没有 body 直接 处理头
         bool handle_request(std::size_t bytes_transferred) { //处理请求
             if (req_.has_body()) {
                 // TODO check call back is having this route
@@ -544,7 +543,7 @@ namespace rojcpp {
             }
         }
 
-        //得到body type
+        //得到body类型
         content_type get_content_type() {
             if (req_.is_chunked())
                 return content_type::chunked;
@@ -585,6 +584,7 @@ namespace rojcpp {
 
             if (req_.has_recieved_all()) {
                 handle_body();
+                return TO_EPOLL_WRITE;
             }
             else {
                 req_.expand_size();
@@ -700,8 +700,8 @@ namespace rojcpp {
             }
 
             call_back();
-            if (!res_.need_delay())
-                do_write();
+            //if (!res_.need_delay()) //这里应该不需要delay 所以我注释了
+                //do_write();
         }
 
         void do_read_form_urlencoded() {
@@ -1448,16 +1448,13 @@ private:
         }
         //-----------------base function----------------//
 
-        //boost::asio::ip::tcp::socket socket_;
-        //boost::asio::steady_timer timer_;
-        
         bool enable_timeout_ = true;
-        response res_;
-        request req_;
+        response res_; //响应
+        request  req_; //请求
         //websocket ws_;
         bool is_upgrade_ = false;
         bool keep_alive_ = false;
-        const std::size_t MAX_REQ_SIZE_{3*1024*1024};
+        const std::size_t MAX_REQ_SIZE_{3*1024*1024}; //请求的最大大小,包括上传文件
         const long KEEP_ALIVE_TIMEOUT_{60*10};
         std::string& static_dir_;
         bool has_shake_ = false;
@@ -1473,7 +1470,7 @@ private:
 
         std::string last_ws_str_;
 
-        std::string chunked_header_;
+        std::string chunked_header_; //响应时如果 chunked_header_ 的内容
         multipart_reader multipart_parser_;
         bool is_multi_part_file_;
         //callback handler to application layer

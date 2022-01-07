@@ -3,7 +3,7 @@
 namespace fs = std::filesystem;
 namespace rojcpp {
     enum class content_type {
-        string,
+        string, // TODO add json
         multipart,
         urlencoded,
         chunked,

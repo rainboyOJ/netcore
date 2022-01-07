@@ -67,15 +67,15 @@ private:
     }
 
     void setParserCallbacks() { //注册这些cb
-        parser.onPartBegin = cbPartBegin;
+        parser.onPartBegin   = cbPartBegin;
         parser.onHeaderField = cbHeaderField;
         parser.onHeaderValue = cbHeaderValue;
-        parser.onHeaderEnd = cbHeaderEnd;
-        parser.onHeadersEnd = cbHeadersEnd;
-        parser.onPartData = cbPartData;
-        parser.onPartEnd = cbPartEnd;
-        parser.onEnd = cbEnd;
-        parser.userData = this; //指向当前的reader
+        parser.onHeaderEnd   = cbHeaderEnd;
+        parser.onHeadersEnd  = cbHeadersEnd;
+        parser.onPartData    = cbPartData;
+        parser.onPartEnd     = cbPartEnd;
+        parser.onEnd         = cbEnd;
+        parser.userData      = this; //指向当前的reader
     }
 
     static void cbPartBegin(const char *buffer, size_t start, size_t end, void *userData) {

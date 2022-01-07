@@ -36,7 +36,8 @@ namespace rojcpp {
             if (need_response_time_) {
                 char mbstr[50];
                 std::time_t tm = std::chrono::system_clock::to_time_t(last_time_);
-                std::strftime(mbstr, sizeof(mbstr), "%a, %d %b %Y %T GMT", std::localtime(&tm)); last_date_str_ = mbstr;
+                std::strftime(mbstr, sizeof(mbstr), "%a, %d %b %Y %T GMT", std::localtime(&tm));
+                last_date_str_ = mbstr;
             }
         }
 
@@ -363,7 +364,9 @@ namespace rojcpp {
         void redirect(const std::string& url,bool is_forever = false)
         {
             add_header("Location",url.c_str());
-            is_forever==false?set_status_and_content(status_type::moved_temporarily):set_status_and_content(status_type::moved_permanently);
+            is_forever==false?
+                set_status_and_content(status_type::moved_temporarily)
+               :set_status_and_content(status_type::moved_permanently);
         }
 
         //有用

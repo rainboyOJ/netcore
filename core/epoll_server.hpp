@@ -32,7 +32,7 @@ public:
 
     ~epoll_server();
     virtual void Start() = 0; //启动
-    using connShrPtr = std::shared_ptr<HttpConn>;
+    using connShrPtr = std::shared_ptr<HttpConn>; //connection的类型
 
 protected:
     bool InitSocket_();  //创建监听socket 并开始listen,加入到epoll里
@@ -49,8 +49,8 @@ protected:
 
     //发送错误
     void SendError_(int fd, const char*info);
-    void ExtentTime_(HttpConn* client);
-    void CloseConn_(HttpConn* client);
+    void ExtentTime_(HttpConn* client); // 拓展对应Fd的时间
+    void CloseConn_(HttpConn* client);  // 关闭连接
 
     void OnRead_(HttpConn* client); // 读取client的数据
     void OnWrite_(HttpConn* client);
@@ -70,10 +70,10 @@ protected:
     uint32_t listenEvent_;
     uint32_t connEvent_;
    
-    std::unique_ptr<HeapTimer> timer_;
-    std::unique_ptr<ThreadPool> threadpool_;
-    std::unique_ptr<Epoller> epoller_;
-    std::unordered_map<int, std::shared_ptr<HttpConn> > users_;
+    std::unique_ptr<HeapTimer> timer_;       //超时控制器
+    std::unique_ptr<ThreadPool> threadpool_; //线程池
+    std::unique_ptr<Epoller> epoller_;       //epoll封装
+    std::unordered_map<int, std::shared_ptr<HttpConn> > users_; // connection 与 SocketFd 的映射
 };
 
 
@@ -282,8 +282,8 @@ void epoll_server<HttpConn>::OnRead_(HttpConn* client) {
     int ret = -1;
     int readErrno = 0;
     ret = client->read(&readErrno); //调用client的read,读取所有的数据
-    if(ret <= 0 && readErrno != EAGAIN) {
-        CloseConn_(client);
+    if(ret <= 0 && readErrno != EAGAIN) { //什么也没有读取到且不是EAGAIN
+        CloseConn_(client); //关闭
         return;
     }
     OnProcess(client);
@@ -292,7 +292,9 @@ void epoll_server<HttpConn>::OnRead_(HttpConn* client) {
 //这样保证了只有一个线程在同一个fd上工作
 template<typename HttpConn>
 void epoll_server<HttpConn>::OnProcess(HttpConn* client) {
-    if(client->process()) {
+    if(client->process()) { 
+        // client->process返回true的时候表示已经读取完毕想要的数据
+        // 转入 写的阶段,否则继续读取
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLOUT);
     } else {
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLIN);
@@ -305,13 +307,17 @@ void epoll_server<HttpConn>::OnWrite_(HttpConn* client) {
     int writeErrno = 0;
     ret = client->write(&writeErrno);
     if(client->ToWriteBytes() == 0) {
+        // 有可能一次写不完
+        // 也有可能 读取->写->读->写 这样
+        // 主要看 connection 的process 是如果工作的
         if( client->has_continue_workd() ) { 
             /* 继续传输 */
             OnProcess(client);
             return;
         }
         /* 传输完成 */
-        LOG_INFO("trans ok IsKeepAlive %d",client->IsKeepAlive());
+        //是否保持长连接?
+        LOG_INFO("trans ok IsKeepAlive %d",client->IsKeepAlive()); 
         if(client->IsKeepAlive()) {
             OnProcess(client);
             return;
