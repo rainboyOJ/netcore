@@ -46,7 +46,7 @@ void Log::init_default()
     level_     = 0;
     isOpen_    = true;
     USE_STDOUT = true;
-    isAsync_   = true;
+    isAsync_   = false;
     if(!deque_) {
         unique_ptr<BlockDeque<std::string>> newDeque(new BlockDeque<std::string>);
         deque_ = move(newDeque);
@@ -114,6 +114,7 @@ void Log::init(int level = 1, const char* path, const char* suffix,
     }
 }
 
+//整个代码的核心
 void Log::write(int level, bool newline,const char *format, ...) {
     struct timeval now = {0, 0};
     gettimeofday(&now, nullptr);
@@ -123,6 +124,7 @@ void Log::write(int level, bool newline,const char *format, ...) {
     va_list vaList;
 
     /* 日志日期 日志行数 */
+    // 创建一个新的文件
     if (!USE_STDOUT && (toDay_ != t.tm_mday || (lineCount_ && (lineCount_  %  MAX_LINES == 0))))
     {
         unique_lock<mutex> locker(mtx_);

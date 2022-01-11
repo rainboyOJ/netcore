@@ -6,26 +6,6 @@
 #include <string>
 #include <cstring>
 
-//extern std::mutex g_log_mutex;  //
-//template<char Delimiter = ' ',typename... Args>
-//void debug_out(std::ostream &os, Args&&... args){
-    ////std::lock_guard<std::mutex> lock(g_log_mutex);
-    //( (os << std::dec << args << Delimiter),... ) <<std::endl;
-//}
-
-//template<char Delimiter = '\0',typename... Args>
-//void debug_out_noendl(std::ostream &os, Args&&... args){
-    ////std::lock_guard<std::mutex> lock(g_log_mutex);
-    //( (os << args << Delimiter),... );
-//}
-
-//#define  log(...) debug_out(std::cout,__FILE__,"Line:",__LINE__,":: ",__VA_ARGS__)
-//#define log_one(name) log(#name,name)
-//#define log_info(...) log(__VA_ARGS__)
-//#define log_error(...) log(__VA_ARGS__)
-//#define  log_noendl(...) debug_out_noendl(std::cout,__FILE__,"Line:",__LINE__,":: ",__VA_ARGS__)
-//#define  log_raw(...) debug_out_noendl(std::cout,__VA_ARGS__)
-
 /*
  * @Author       : mark
  * @Date         : 2020-06-16
@@ -48,14 +28,15 @@
 class Log {
 public:
     void init_default();   //使用stout作为log
-    void init(int level, const char* path = "./log", 
-                const char* suffix =".log",
-                int maxQueueCapacity = 1024);
+    void init(int level,                    //等级
+            const char* path = "./log",     //路径
+            const char* suffix =".log",     //后缀
+            int maxQueueCapacity = 1024);   //最大队列
 
-    static Log* Instance();
+    static Log* Instance();                 //Singleton
     static void FlushLogThread();
 
-    void write(int level,bool newline ,const char *format,...);
+    void write(int level,bool newline ,const char *format,...); //写
     void flush();
 
     int GetLevel();
@@ -71,7 +52,7 @@ private:
 private:
     static const int LOG_PATH_LEN = 256;
     static const int LOG_NAME_LEN = 256;
-    static const int MAX_LINES = 50000;
+    static const int MAX_LINES = 50000; //最大行数
 
     const char* path_;
     const char* suffix_;
@@ -90,7 +71,7 @@ private:
     FILE* fp_;
     bool USE_STDOUT;
     std::unique_ptr<BlockDeque<std::string>> deque_; 
-    std::unique_ptr<std::thread> writeThread_;
+    std::unique_ptr<std::thread> writeThread_; //写线程
     std::mutex mtx_;
 };
 
