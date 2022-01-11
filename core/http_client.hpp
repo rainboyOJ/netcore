@@ -1,4 +1,6 @@
 #pragma once
+
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <tuple>
@@ -8,19 +10,153 @@
 #include <mutex>
 #include <deque>
 #include <string_view>
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
+
 #include "use_asio.hpp"
 #include "uri.hpp"
 #include "http_parser.hpp"
 #include "itoa_jeaiii.hpp"
 #include "modern_callback.h"
 
-#ifdef CINATRA_ENABLE_SSL
-#ifdef ASIO_STANDALONE
-#include <asio/ssl.hpp>
-#else
-#include <boost/asio/ssl.hpp>
-#endif
-#endif
+template<typename... Args>
+void log_impl(Args&&... args){
+    ( (std::cerr << args ),...);
+    std::cerr << std::endl;
+}
+
+#define log(...) log_impl(__FILE__ ," line: ",__LINE__," ",__VA_ARGS__);
+
+
+enum error_code : int{
+    EC_FAIL = 1,
+    EC_in_progress = 2,
+EC_invalid_argument = 3
+};
+
+
+
+// TCP客户端类
+class CTcpClient
+{
+    public:
+        int m_sockfd;
+
+        CTcpClient():m_sockfd{0} {};
+
+        // 向服务器发起连接，serverip-服务端ip，port通信端口
+        bool ConnectToServer(const char *serverip,const int port){
+            m_sockfd = socket(AF_INET,SOCK_STREAM,0); // 创建客户端的socket
+
+            struct hostent* h; // ip地址信息的数据结构
+            if ( (h=gethostbyname(serverip))==0 )
+            { ::close(m_sockfd); m_sockfd=0; return false; }
+
+            // 把服务器的地址和端口转换为数据结构
+            struct sockaddr_in servaddr;
+            memset(&servaddr,0,sizeof(servaddr));
+            servaddr.sin_family = AF_INET;
+            servaddr.sin_port = htons(port);
+            memcpy(&servaddr.sin_addr,h->h_addr,h->h_length);
+
+            // 向服务器发起连接请求
+            if (connect(m_sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr))!=0)
+            { ::close(m_sockfd); m_sockfd=0; return false; }
+
+            return true;
+        }
+        // 向对端发送报文
+        int  Send(const void *buf,const int buflen){
+            return send(m_sockfd,buf,buflen,0);
+        }
+
+        int Writen(const char *buffer,const size_t n)
+        {
+            int nLeft,idx,nwritten;
+            nLeft = n;  
+            idx = 0;
+            while(nLeft > 0 )
+            {
+                if ( (nwritten = send(m_sockfd, buffer + idx,nLeft,0)) <= 0) 
+                    return nwritten;
+                nLeft -= nwritten;
+                idx += nwritten;
+            }
+            return n;
+        }
+
+        // 接收对端的报文
+        int  Recv(void *buf,const int buflen){
+            return recv(m_sockfd,buf,buflen,0);
+        }
+        size_t get_recved_len(){
+            return m_recv_str_buf.length();
+        }
+
+        std::tuple<bool,std::string>
+        readN(int Siz){
+            std::string recv_str(m_recv_str_buf);
+            while ( Siz > 0 ) {
+                int numBytesRead = Recv(buf,sizeof(buf));
+                if( numBytesRead > 0 ){
+                    for(int i=0;i<=numBytesRead-1;++i) recv_str += buf[i];
+                    Siz -= numBytesRead;
+                }
+                else return {false,""};
+            }
+            return {true,recv_str};
+        }
+
+        std::tuple<bool,std::string>
+        read_until(std::string_view lit){
+            std::string recv_str(m_recv_str_buf);
+            while ( 1 ) {
+                log("start read");
+                int numBytesRead = Recv(buf,sizeof(buf));
+                log("numBytesRead ",numBytesRead);
+
+                auto endsWith= [&](){
+                    if( recv_str.length() < lit.length()) return false;
+                    auto it = recv_str.rbegin();
+                    for(int j = lit.length() - 1 ;j >=0 ;--j,++it){
+                        if( lit[j] != *it) 
+                            return false;
+                    }
+                    return true;
+                };
+                if( numBytesRead > 0 ){
+                    //检查是否有这个位置
+                    for(int i=0;i<=numBytesRead-1;++i){
+                        recv_str += buf[i];
+                        //std::cout << buf[i];
+                        if( endsWith() ){
+                            m_recv_str_buf = std::string(buf+i+1,buf+numBytesRead);
+                            return {true,recv_str};
+                        }
+                    }
+                }
+                else {
+                    return {false,""};
+                }
+            }
+            return {true,recv_str};
+        }
+
+        void close(){
+            if( m_sockfd != 0) {
+                ::close(m_sockfd);
+                m_sockfd = 0;
+            }
+        }
+        ~CTcpClient() { close(); }
+
+        std::string m_recv_str_buf;
+        char buf[1024]{0};
+};
 
 namespace rojcpp {
     struct response_data {
@@ -31,21 +167,20 @@ namespace rojcpp {
     };
     using callback_t = std::function<void(response_data)>;
 
-    inline static std::string INVALID_URI = "invalid_uri";
-    inline static std::string REQUEST_TIMEOUT = "request timeout";
-    inline static std::string MULTIPLE_REQUEST = "last async request not finished";
-    inline static std::string METHOD_ERROR = "method error";
-    inline static std::string INVALID_FILE_PATH = "invalid file path";
-    inline static std::string OPEN_FAILED = "open file failed";
-    inline static std::string FILE_SIZE_ERROR = "filesize error";
-    inline static std::string RESP_PARSE_ERROR = "http response parse error";
+    inline static std::string INVALID_URI        = "invalid_uri";
+    inline static std::string REQUEST_TIMEOUT    = "request timeout";
+    inline static std::string MULTIPLE_REQUEST   = "last async request not finished";
+    inline static std::string METHOD_ERROR       = "method error";
+    inline static std::string INVALID_FILE_PATH  = "invalid file path";
+    inline static std::string OPEN_FAILED        = "open file failed";
+    inline static std::string FILE_SIZE_ERROR    = "filesize error";
+    inline static std::string RESP_PARSE_ERROR   = "http response parse error";
     inline static std::string INVALID_CHUNK_SIZE = "invalid chunk size";
-    inline static std::string READ_TIMEOUT = "read timeout";
+    inline static std::string READ_TIMEOUT       = "read timeout";
 
     class http_client : public std::enable_shared_from_this<http_client> {
     public:
-        http_client(boost::asio::io_service& ios) :
-            ios_(ios), resolver_(ios), socket_(ios), timer_(ios) {
+        http_client() {
             future_ = read_close_finished_.get_future();
         }
 
@@ -106,7 +241,7 @@ namespace rojcpp {
             in_progress_ = false;
             if (status == std::future_status::timeout) {
                 promise_ = nullptr;
-                return { boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), 404, REQUEST_TIMEOUT };
+                return {EC_invalid_argument, 404, REQUEST_TIMEOUT };
             }
             auto result = future.get();
             promise_ = nullptr;
@@ -218,7 +353,7 @@ namespace rojcpp {
             }
 
             if (in_progress_) {
-                set_error_value(cb, boost::asio::error::basic_errors::in_progress, MULTIPLE_REQUEST);
+                set_error_value(cb, EC_in_progress, MULTIPLE_REQUEST);
                 return;
             }
             else {
@@ -226,7 +361,7 @@ namespace rojcpp {
             }
 
             if (method != http_method::POST && !body.empty()) {
-                set_error_value(cb, boost::asio::error::basic_errors::invalid_argument, METHOD_ERROR);
+                set_error_value(cb, EC_invalid_argument, METHOD_ERROR);
                 return;
             }
 
@@ -241,12 +376,12 @@ namespace rojcpp {
                 read_close_finished_ = {};
                 future_ = read_close_finished_.get_future();
 
-                reset_socket();
+                //reset_socket();
             }
 
             auto [r, u] = get_uri(uri);
             if (!r) {
-                set_error_value(cb, boost::asio::error::basic_errors::invalid_argument, INVALID_URI);          
+                set_error_value(cb, EC_invalid_argument, INVALID_URI);          
                 return;
             }
 
@@ -256,7 +391,7 @@ namespace rojcpp {
             cb_ = std::move(cb);
             context ctx(u, method, std::move(body));
             if (promise_) {
-                weak_ = promise_;
+                weak_ = promise_; //weak_ 指向 promise_
             }
             if (has_connected_) {
                 do_write(std::move(ctx));
@@ -285,20 +420,20 @@ namespace rojcpp {
             fs::create_directories(parant_path, code);
             if (code) {
                 cb_ = std::move(cb);
-                callback(boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), INVALID_FILE_PATH);
+                callback(EC_invalid_argument, INVALID_FILE_PATH);
                 return;
             }
 
             if (size > 0) {
                 char buffer[20];
-                auto p = i64toa_jeaiii(size, buffer);
+                auto p = cinatra::i64toa_jeaiii(size, buffer);
                 add_header("cinatra_start_pos", std::string(buffer, p - buffer));
             }
             else {
                 int64_t file_size = fs::file_size(dest_file, code);
                 if (!code && file_size > 0) {
                     char buffer[20];
-                    auto p = i64toa_jeaiii(file_size, buffer);
+                    auto p = cinatra::i64toa_jeaiii(file_size, buffer);
                     add_header("cinatra_start_pos", std::string(buffer, p - buffer));
                 }
             }
@@ -306,20 +441,20 @@ namespace rojcpp {
             download_file_ = std::make_shared<std::ofstream>(dest_file, std::ios::binary | std::ios::app);
             if (!download_file_->is_open()) {
                 cb_ = std::move(cb);
-                callback(boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), OPEN_FAILED);
+                callback(EC_invalid_argument, OPEN_FAILED);
                 return;
             }
 
             if (size > 0) {
                 char buffer[20];
-                auto p = i64toa_jeaiii(size, buffer);
+                auto p = cinatra::i64toa_jeaiii(size, buffer);
                 add_header("cinatra_start_pos", std::string(buffer, p - buffer));
             }
             else {
                 int64_t file_size = fs::file_size(dest_file, code);
                 if (!code && file_size > 0) {
                     char buffer[20];
-                    auto p = i64toa_jeaiii(file_size, buffer);
+                    auto p = cinatra::i64toa_jeaiii(file_size, buffer);
                     add_header("cinatra_start_pos", std::string(buffer, p - buffer));
                 }
             }
@@ -385,38 +520,33 @@ namespace rojcpp {
             return parser_.get_header_value(key);
         }
 
-#ifdef CINATRA_ENABLE_SSL
-        void set_ssl_context_callback(std::function<void(boost::asio::ssl::context&)> ssl_context_callback) {
-            ssl_context_callback_ = std::move(ssl_context_callback);
-        }
-#endif
 
     private:
-        void callback(const int& ec) {
+        void callback(const int ec) {
             callback(ec, 404, "");
         }
 
-        void callback(const int& ec, std::string error_msg) {
+        void callback(const int ec, std::string error_msg) {
             callback(ec, 404, std::move(error_msg));
         }
 
-        void callback(const int& ec, int status) {
+        void callback(const int ec, int status) {
             callback(ec, status, "");
         }
 
-        void callback(const int& ec, int status, std::string_view result) {
+        void callback(const int ec, int status, std::string_view result) {
             if (auto sp = weak_.lock(); sp) {
                 sp->set_value({ ec, status, result, get_resp_headers() });
                 weak_.reset();
                 return;
             }
 
-            if (cb_) {
+            if (cb_) { //有回调函数
                 cb_({ ec, status, result, get_resp_headers() });
                 cb_ = nullptr;
             }
 
-            if (on_chunk_) {
+            if (on_chunk_) { //处理 chunk_
                 on_chunk_(ec, result);
             }
 
@@ -437,12 +567,7 @@ namespace rojcpp {
             }
 
             if (u.schema == "https"sv) {
-#ifdef CINATRA_ENABLE_SSL
-                upgrade_to_ssl();
-#else
-                //please open CINATRA_ENABLE_SSL before request https!
                 assert(false);
-#endif
             }
 
             return { true, u };
@@ -450,39 +575,21 @@ namespace rojcpp {
 
         void async_connect(context ctx) {
             reset_timer();
-            boost::asio::ip::tcp::resolver::query query(ctx.host, ctx.port);
-            resolver_.async_resolve(query, [this, self = this->shared_from_this(), ctx = std::move(ctx)]
-            (int ec, const boost::asio::ip::tcp::resolver::iterator& it) {
-                if (ec) {                   
-                    callback(ec);
-                    return;
-                }
+            bool succ = client_.ConnectToServer(ctx.host.c_str(), atoi(ctx.port.c_str()));
+            if (!succ) {                   
+                callback(EC_FAIL);
+                client_.close();
+                return;
+            }
 
-                boost::asio::async_connect(socket_, it, [this, self = shared_from_this(), ctx = std::move(ctx)]
-                (int ec, const boost::asio::ip::tcp::resolver::iterator&) {
-                    cancel_timer();
-                    if (!ec) {
-                        has_connected_ = true;
-                        if (is_ssl()) {
-                            handshake(std::move(ctx));
-                            return;
-                        }
-
-                        do_read_write(ctx);
-                    }
-                    else {
-                        callback(ec);
-                        close();
-                    }
-                });
-            });
+            has_connected_ = true;
+            do_read_write(ctx);
         }
 
         void do_read_write(const context& ctx) {
             int error_ignored;
-            socket_.set_option(boost::asio::ip::tcp::no_delay(true), error_ignored);            
-            do_read();
             do_write(ctx);
+            do_read();
         }
 
         void do_write(const context& ctx) {
@@ -496,7 +603,7 @@ namespace rojcpp {
 
         void send_msg(const context& ctx) {
             write_msg_ = build_write_msg(ctx);
-            async_write(write_msg_, [this, self = shared_from_this()](const int& ec, const size_t length) {
+            Write(write_msg_, [this, self = shared_from_this()](const int& ec, const size_t length) {
                 if (ec) {
                     callback(ec);
                     close();
@@ -509,7 +616,7 @@ namespace rojcpp {
             auto filename = std::move(multipart_str_);
             auto file = std::make_shared<std::ifstream>(filename, std::ios::binary);
             if (!file) {
-                callback(boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), INVALID_FILE_PATH);
+                callback(EC_invalid_argument, INVALID_FILE_PATH);
                 return;
             }
 
@@ -517,7 +624,7 @@ namespace rojcpp {
             size_t size = fs::file_size(filename, ec);
             if (ec || start_ == -1) {
                 file->close();
-                callback(boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), FILE_SIZE_ERROR);
+                callback(EC_invalid_argument, FILE_SIZE_ERROR);
                 return;
             }
 
@@ -532,22 +639,6 @@ namespace rojcpp {
             write_str.append(multipart_str);
             multipart_str_ = std::move(write_str);
             send_file_data(std::move(file));
-        }
-
-        void handshake(context ctx) {
-#ifdef CINATRA_ENABLE_SSL
-            auto self = this->shared_from_this();
-            ssl_stream_->async_handshake(boost::asio::ssl::stream_base::client,
-                [this, self, ctx = std::move(ctx)](const int& ec) {
-                if (!ec) {
-                    do_read_write(ctx);
-                }
-                else {
-                    callback(ec);
-                    close();
-                }
-            });
-#endif
         }
 
         std::string build_write_msg(const context& ctx, size_t content_len = 0) {
@@ -588,7 +679,7 @@ namespace rojcpp {
             //add content
             if (!ctx.body.empty()) {
                 char buffer[20];
-                auto p = i32toa_jeaiii((int)ctx.body.size(), buffer);
+                auto p = cinatra::i32toa_jeaiii((int)ctx.body.size(), buffer);
 
                 write_msg.append("Content-Length: ").append(buffer, p - buffer).append("\r\n");
             }
@@ -596,7 +687,7 @@ namespace rojcpp {
                 if (ctx.method == http_method::POST) {
                     if (content_len > 0) {
                         char buffer[20];
-                        auto p = i32toa_jeaiii((int)content_len, buffer);
+                        auto p = cinatra::i32toa_jeaiii((int)content_len, buffer);
 
                         write_msg.append("Content-Length: ").append(buffer, p - buffer).append("\r\n");
                     }
@@ -621,6 +712,41 @@ namespace rojcpp {
 
         void do_read() {
             reset_timer();
+            auto __header__ = client_.read_until("\r\n\r\n");
+            cancel_timer();
+            if(std::get<0>(__header__) == false){
+                log("读取失败");
+                close();
+                return;
+            }
+            else {
+                std::cout << "read_header" << std::endl;
+                //std::cout << std::get<1>(__header__) << std::endl;
+                //callback(0,200,std::get<1>(__header__));
+                auto & headers = std::get<1>(__header__);
+                int ret = parser_.parse_response(headers.c_str(),headers.size(),0);
+                if( ret < 0){
+                    callback(EC_invalid_argument, 404,
+                            RESP_PARSE_ERROR);
+                    close();
+                    return;
+                }
+
+                bool is_chunked = parser_.is_chunked();
+                std::cout << "body_len: " ;
+                std::cout << parser_.body_len() << std::endl;
+                if( parser_.body_len() == 0){
+                    callback(0,parser_.status());
+                    close();
+                    return;
+                }
+
+                size_t content_len = (size_t)parser_.body_len();
+                size_t size_to_read = content_len - client_.get_recved_len();
+                copy_headers(); // TODO ????
+                do_read_body(false,parser_.status(),size_to_read);
+            }
+            /*
             async_read_until(TWO_CRCF, [this, self = shared_from_this()](auto ec, size_t size) {
                 cancel_timer();
                 if (!ec) {
@@ -630,7 +756,7 @@ namespace rojcpp {
                     int ret = parser_.parse_response(data_ptr, size, 0);
                     read_buf_.consume(size);
                     if (ret < 0) {
-                        callback(boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), 404,
+                        callback(EC_invalid_argument, 404,
                             RESP_PARSE_ERROR);
                         if (buf_size > size) {
                             read_buf_.consume(buf_size - size);
@@ -678,6 +804,7 @@ namespace rojcpp {
                         read_close_finished_.set_value(true);
                 }
             });
+            */
         }
 
         bool is_ready() {
@@ -686,23 +813,25 @@ namespace rojcpp {
 
         void do_read_body(bool keep_alive, int status, size_t size_to_read) {
             reset_timer();
-            async_read(size_to_read, [this, self = shared_from_this(), keep_alive, status](auto ec, size_t size) {
-                cancel_timer();
-                if (!ec) {
-                    size_t data_size = read_buf_.size();
-                    const char* data_ptr = boost::asio::buffer_cast<const char*>(read_buf_.data());
+            auto body = client_.readN(size_to_read);
+            callback(0,status,std::get<1>(body));
+            //async_read(size_to_read, [this, self = shared_from_this(), keep_alive, status](auto ec, size_t size) {
+                //cancel_timer();
+                //if (!ec) {
+                    //size_t data_size = read_buf_.size();
+                    //const char* data_ptr = boost::asio::buffer_cast<const char*>(read_buf_.data());
 
-                    callback(ec, status, { data_ptr, data_size });
+                    //callback(ec, status, { data_ptr, data_size });
 
-                    read_buf_.consume(data_size);
+                    //read_buf_.consume(data_size);
 
-                    read_or_close(keep_alive);
-                }
-                else {
-                    callback(ec);
-                    close();
-                }
-            });
+                    //read_or_close(keep_alive);
+                //}
+                //else {
+                    //callback(ec);
+                    //close();
+                //}
+            //});
         }
 
         void read_or_close(bool keep_alive) {
@@ -716,82 +845,82 @@ namespace rojcpp {
 
         void read_chunk_head(bool keep_alive) {
             reset_timer();
-            async_read_until(CRCF, [this, self = shared_from_this(), keep_alive](auto ec, size_t size) {
-                cancel_timer();
-                if (!ec) {
-                    size_t buf_size = read_buf_.size();
-                    const char* data_ptr = boost::asio::buffer_cast<const char*>(read_buf_.data());
-                    std::string_view size_str(data_ptr, size - CRCF.size());
-                    auto chunk_size = hex_to_int(size_str);
-                    if (chunk_size < 0) {
-                        callback(boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), 404,
-                            INVALID_CHUNK_SIZE);
-                        read_or_close(keep_alive);
-                        return;
-                    }
+            //async_read_until(CRCF, [this, self = shared_from_this(), keep_alive](auto ec, size_t size) {
+                //cancel_timer();
+                //if (!ec) {
+                    //size_t buf_size = read_buf_.size();
+                    //const char* data_ptr = boost::asio::buffer_cast<const char*>(read_buf_.data());
+                    //std::string_view size_str(data_ptr, size - CRCF.size());
+                    //auto chunk_size = hex_to_int(size_str);
+                    //if (chunk_size < 0) {
+                        //callback(EC_invalid_argument, 404,
+                            //INVALID_CHUNK_SIZE);
+                        //read_or_close(keep_alive);
+                        //return;
+                    //}
 
-                    read_buf_.consume(size);
+                    //read_buf_.consume(size);
 
-                    if (chunk_size == 0) {
-                        if (read_buf_.size() < CRCF.size()) {
-                            read_buf_.consume(read_buf_.size());
-                            read_chunk_body(keep_alive, CRCF.size() - read_buf_.size());
-                        }
-                        else {
-                            read_buf_.consume(CRCF.size());
-                            read_chunk_body(keep_alive, 0);
-                        }
-                        return;
-                    }
+                    //if (chunk_size == 0) {
+                        //if (read_buf_.size() < CRCF.size()) {
+                            //read_buf_.consume(read_buf_.size());
+                            //read_chunk_body(keep_alive, CRCF.size() - read_buf_.size());
+                        //}
+                        //else {
+                            //read_buf_.consume(CRCF.size());
+                            //read_chunk_body(keep_alive, 0);
+                        //}
+                        //return;
+                    //}
 
-                    if ((size_t)chunk_size <= read_buf_.size()) {
-                        const char* data = boost::asio::buffer_cast<const char*>(read_buf_.data());
-                        append_chunk(std::string_view(data, chunk_size));
-                        read_buf_.consume(chunk_size + CRCF.size());
-                        read_chunk_head(keep_alive);
-                        return;
-                    }
+                    //if ((size_t)chunk_size <= read_buf_.size()) {
+                        //const char* data = boost::asio::buffer_cast<const char*>(read_buf_.data());
+                        //append_chunk(std::string_view(data, chunk_size));
+                        //read_buf_.consume(chunk_size + CRCF.size());
+                        //read_chunk_head(keep_alive);
+                        //return;
+                    //}
 
-                    size_t extra_size = read_buf_.size();
-                    size_t size_to_read = chunk_size - extra_size;
-                    const char* data = boost::asio::buffer_cast<const char*>(read_buf_.data());
-                    append_chunk({ data, extra_size });
-                    read_buf_.consume(extra_size);
+                    //size_t extra_size = read_buf_.size();
+                    //size_t size_to_read = chunk_size - extra_size;
+                    //const char* data = boost::asio::buffer_cast<const char*>(read_buf_.data());
+                    //append_chunk({ data, extra_size });
+                    //read_buf_.consume(extra_size);
 
-                    read_chunk_body(keep_alive, size_to_read + CRCF.size());
-                }
-                else {
-                    callback(ec);
-                    close();
-                }
-            });
+                    //read_chunk_body(keep_alive, size_to_read + CRCF.size());
+                //}
+                //else {
+                    //callback(ec);
+                    //close();
+                //}
+            //});
         }
 
         void read_chunk_body(bool keep_alive, size_t size_to_read) {
             reset_timer();
-            async_read(size_to_read, [this, self = shared_from_this(), keep_alive](auto ec, size_t size) {
-                cancel_timer();
-                if (!ec) {
-                    if (size <= CRCF.size()) {
-                        //finish all chunked
-                        read_buf_.consume(size);
-                        callback(ec, 200, chunked_result_);
-                        clear_chunk_buffer();
-                        do_read();
-                        return;
-                    }
+            //async_read(size_to_read, [this, self = shared_from_this(), keep_alive](auto ec, size_t size) {
+                //cancel_timer();
+                //if (!ec) {
+                    //if (size <= CRCF.size()) {
+                        ////finish all chunked
+                        //read_buf_.consume(size);
+                        //callback(ec, 200, chunked_result_);
+                        //clear_chunk_buffer();
+                        //do_read();
+                        //return;
+                    //}
 
-                    size_t buf_size = read_buf_.size();
-                    const char* data_ptr = boost::asio::buffer_cast<const char*>(read_buf_.data());
-                    append_chunk({ data_ptr, size - CRCF.size() });
-                    read_buf_.consume(size);
-                    read_chunk_head(keep_alive);
-                }
-                else {
-                    callback(ec);
-                    close();
-                }
-            });
+                    //size_t buf_size = read_buf_.size();
+                    //const char* data_ptr = boost::asio::buffer_cast<const char*>(read_buf_.data());
+                    //append_chunk({ data_ptr, size - CRCF.size() });
+                    //read_buf_.consume(size);
+                    //read_chunk_head(keep_alive);
+                //}
+                //else {
+                    //callback(ec);
+                    //close();
+                //}
+            //});
         }
 
         void append_chunk(std::string_view chunk) {
@@ -821,115 +950,71 @@ namespace rojcpp {
 
         template<typename Handler>
         void async_read(size_t size_to_read, Handler handler) {
-            if (is_ssl()) {
-#ifdef CINATRA_ENABLE_SSL
-                boost::asio::async_read(*ssl_stream_, read_buf_, boost::asio::transfer_exactly(size_to_read), std::move(handler));
-#endif
-            }
-            else {
-                boost::asio::async_read(socket_, read_buf_, boost::asio::transfer_exactly(size_to_read), std::move(handler));
-            }
+                //boost::asio::async_read(socket_, read_buf_, boost::asio::transfer_exactly(size_to_read), std::move(handler));
         }
 
         template<typename Handler>
         void async_read_until(const std::string& delim, Handler handler) {
-            if (is_ssl()) {
-#ifdef CINATRA_ENABLE_SSL
-                boost::asio::async_read_until(*ssl_stream_, read_buf_, delim, std::move(handler));
-#endif
-            }
-            else {
-                boost::asio::async_read_until(socket_, read_buf_, delim, std::move(handler));
-            }
+            //boost::asio::async_read_until(socket_, read_buf_, delim, std::move(handler));
         }
 
+        //写数据
         template<typename Handler>
-        void async_write(const std::string& msg, Handler handler) {
-            if (is_ssl()) {
-#ifdef CINATRA_ENABLE_SSL
-                boost::asio::async_write(*ssl_stream_, boost::asio::buffer(msg), std::move(handler));
-#endif
+        void Write(const std::string& msg, Handler handler) {
+            //boost::asio::Write(socket_, boost::asio::buffer(msg), std::move(handler));
+            int ret = client_.Writen(msg.c_str(), msg.length());
+            if( ret < 0 ){
+                log("写入时发生错误");
+                callback(EC_FAIL);
             }
-            else {
-                boost::asio::async_write(socket_, boost::asio::buffer(msg), std::move(handler));
-            }
+            //if( handler != nullptr)
+                //handler();
         }
 
         void close(bool close_ssl = true) {
             int ec;
-            if (close_ssl) {
-#ifdef CINATRA_ENABLE_SSL
-                if (ssl_stream_) {
-                    ssl_stream_->shutdown(ec);
-                    ssl_stream_ = nullptr;
-                }
-#endif
-            }
-
             if (!has_connected_)
                 return;
 
             has_connected_ = false;
-            timer_.cancel(ec);
-            socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-            socket_.close(ec);
+            //timer_.cancel(ec);
+            client_.close();
         }
 
         void reset_timer() {
-            if (timeout_seconds_ == 0 || promise_) {
-                return;
-            }
+            //if (timeout_seconds_ == 0 || promise_) {
+                //return;
+            //}
 
-            auto self(this->shared_from_this());
-            timer_.expires_from_now(std::chrono::seconds(timeout_seconds_));
-            timer_.async_wait([this, self](const int& ec) {
-                if (ec || sync_) {
-                    return;
-                }
+            //auto self(this->shared_from_this());
+            //timer_.expires_from_now(std::chrono::seconds(timeout_seconds_));
+            //timer_.async_wait([this, self](const int& ec) {
+                //if (ec || sync_) {
+                    //return;
+                //}
 
-                close(false); //don't close ssl now, close ssl when read/write error
-                if (download_file_) {
-                    download_file_->close();
-                }
-            });
+                //close(false); //don't close ssl now, close ssl when read/write error
+                //if (download_file_) {
+                    //download_file_->close();
+                //}
+            //});
         }
 
         void cancel_timer() {
-            if (!cb_) {
-                return; //just for async request
-            }
+            //if (!cb_) {
+                //return; //just for async request
+            //}
 
-            if (timeout_seconds_ == 0 || promise_) {
-                return;
-            }
+            //if (timeout_seconds_ == 0 || promise_) {
+                //return;
+            //}
 
-            timer_.cancel();
+            //timer_.cancel();
         }
 
         bool is_ssl() const {
-#ifdef CINATRA_ENABLE_SSL
-            return ssl_stream_ != nullptr;
-#else
             return false;
-#endif
         }
-
-#ifdef CINATRA_ENABLE_SSL
-        void upgrade_to_ssl() {
-            if (ssl_stream_)
-                return;
-
-            boost::asio::ssl::context ssl_context(boost::asio::ssl::context::sslv23);
-            ssl_context.set_default_verify_paths();
-            int ec;
-            ssl_context.set_options(boost::asio::ssl::context::default_workarounds, ec);
-            if (ssl_context_callback_) {
-                ssl_context_callback_(ssl_context);
-            }
-            ssl_stream_ = std::make_unique<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>>(socket_, ssl_context);
-            //verify peer TODO
-        }
-#endif
 
         void send_file_data(std::shared_ptr<std::ifstream> file) {
             auto eof = make_upload_data(*file);
@@ -938,7 +1023,7 @@ namespace rojcpp {
             }
 
             auto self = this->shared_from_this();
-            async_write(multipart_str_, [this, self, file = std::move(file)](int ec, std::size_t length) mutable {
+            Write(multipart_str_, [this, self, file = std::move(file)](int ec, std::size_t length) mutable {
                 if (!ec) {
                     multipart_str_.clear();
                     send_file_data(std::move(file));
@@ -1000,20 +1085,13 @@ namespace rojcpp {
             }
         }
 
-        void reset_socket() {
-            int igored_ec;
-            socket_ = decltype(socket_)(ios_);
-            if (!socket_.is_open()) {
-                socket_.open(boost::asio::ip::tcp::v4(), igored_ec);
-            }
-        }
 
-        void set_error_value(const callback_t& cb, const boost::asio::error::basic_errors& ec, const std::string& error_msg) {
+        void set_error_value(const callback_t& cb,error_code  ec, const std::string& error_msg) {
             if (promise_) {
-                promise_->set_value({ boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), 404, error_msg });
+                promise_->set_value({ EC_invalid_argument, 404, error_msg });
             }
             if (cb) {
-                cb({ boost::asio::error::make_error_code(boost::asio::error::basic_errors::invalid_argument), 404, error_msg });
+                cb({ EC_invalid_argument, 404, error_msg });
             }
             read_close_finished_ = {};
         }
@@ -1023,16 +1101,7 @@ namespace rojcpp {
         callback_t cb_;
         std::atomic_bool in_progress_ = false;
 
-        boost::asio::io_service& ios_;
-        boost::asio::ip::tcp::resolver resolver_;
-        boost::asio::ip::tcp::socket socket_;
-#ifdef CINATRA_ENABLE_SSL
-        std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;
-        std::function<void(boost::asio::ssl::context&)> ssl_context_callback_;
-#endif
-        boost::asio::steady_timer timer_;
         std::size_t timeout_seconds_ = 60;
-        boost::asio::streambuf read_buf_;
 
         http_parser parser_;
         std::vector<std::pair<std::string, std::string>> copy_headers_;
@@ -1056,5 +1125,6 @@ namespace rojcpp {
         std::shared_ptr<std::promise<response_data>> promise_ = nullptr;
         std::weak_ptr<std::promise<response_data>> weak_;
         bool sync_ = false;
+        CTcpClient client_; //封装的socket服务器
     };
 }

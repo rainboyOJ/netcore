@@ -217,23 +217,25 @@ namespace rojcpp {
         }
 
         std::string get_port() const {
-            std::string port_str;
-            if (is_ssl) {
-                if (port.empty()) {
-                    port_str = "https";
-                }
-                else {
-                    port_str = std::string(port);
-                }
-            }
-            else {
-                if (port.empty()) {
-                    port_str = "http";
-                }
-                else {
-                    port_str = std::string(port);
-                }
-            }
+            std::string port_str{"80"};
+            if( !port.empty() )
+                port_str = std::string(port);
+            //if (is_ssl) {
+                //if (port.empty()) {
+                    //port_str = "https";
+                //}
+                //else {
+                    //port_str = std::string(port);
+                //}
+            //}
+            //else {
+                //if (port.empty()) {
+                    //port_str = "http";
+                //}
+                //else {
+                    //port_str = std::string(port);
+                //}
+            //}
 
             return port_str;
         }
