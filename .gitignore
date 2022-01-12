@@ -37,3 +37,4 @@ src/server
 coredump.*
 *.break
 www/
+build/
