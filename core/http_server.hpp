@@ -36,7 +36,22 @@ namespace rojcpp {
     class http_server_ : private noncopyable ,public epoll_server<connection> {
     public:
         using type = int; // fd is int
-        http_server_() = default;
+        http_server_() {
+            init(8099 //端口
+                ,2 //int trigMode, 2表示监听的时候是 LET 模式
+                ,10*1000 //int timeoutMS 超时就会断开连接
+                ,true //bool OptLinger, 优雅关闭: 直到所剩数据发送完毕或超时 
+                ,3306 //int sqlPort,
+                ,"root" //const char *sqlUser,
+                ,"root" //const char *sqlPwd,
+                ,"rojcpp" //const char *dbName,
+                ,4//int connPoolNum,
+                ,4//int threadNum,
+                ,true//bool openLog,
+                ,3//int logLevel,
+                ,1//int logQueSize
+                );
+        };
 
         void init(
         int port, int trigMode, int timeoutMS, bool OptLinger, 
