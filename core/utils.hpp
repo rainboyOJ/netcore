@@ -588,7 +588,9 @@ namespace rojcpp {
             using type = Default;
         };
 
-
+        /**
+         * @brief 特化版 如果存在Op<Args...> 就是这个
+         */
         template<class Default, template<class...> class Op, class... Args>
         struct detector<Default, std::void_t<Op<Args...>>, Op, Args...> {
             using value_t = std::true_type;
@@ -601,6 +603,7 @@ namespace rojcpp {
         template<template<class...> class Op, class... Args>
         using detected_t = typename detector<nonesuch, void, Op, Args...>::type;
 
+        //before返回值k的类型
         template<class T, typename... Args>
         using has_before_t = decltype(std::declval<T>().before(std::declval<Args>()...));
 
@@ -608,6 +611,7 @@ namespace rojcpp {
         using has_after_t = decltype(std::declval<T>().after(std::declval<Args>()...));
     }
     
+    //有before 且before 要符合Op<args...>
     template<typename T, typename... Args>
     using has_before = is_detected<has_before_t, T, Args...>;
 

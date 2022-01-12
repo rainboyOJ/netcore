@@ -82,7 +82,8 @@ namespace rojcpp { //路由用的
                 }
             }
 
-            auto it = map_invokers_.find(url);
+            // 查询完全匹配
+            auto it = map_invokers_.find(url); 
             if (it != map_invokers_.end()) {
                 auto& pair = it->second;
                 if (method[0] < 'A' || method[0] > 'Z')
@@ -97,12 +98,12 @@ namespace rojcpp { //路由用的
                 return true;
             }
             else {
-                if (url.rfind(DOT) != std::string_view::npos) {
+                if (url.rfind(DOT) != std::string_view::npos) { //是一个文件，包含.字符
                     url = STATIC_RESOURCE;  // 处理静态文件
-                    return route(method, url, req, res,route_it);
+                    return route(method, url, req, res,route_it); //处理
                 }
 
-                return get_wildcard_function(url, req, res,route_it);
+                return get_wildcard_function(url, req, res,route_it);//模糊匹配
             }
         }
 
@@ -130,28 +131,41 @@ namespace rojcpp { //路由用的
             }
         }
 
+        /**
+         * @brief 注册函数路由的实现
+         *
+         * @param raw_name url的名称 或 url 本身
+         * @param arr 一个表明路由函数注册到哪个http method的数组，列表G 表示GET,P->POST
+         * @param f 路由函数类型 @param ap AP路由函数的前置或后置点，就是在路由函数f执行前后执行的函数
+         * @return void
+         *   @retval void
+         */
         template<typename Function, typename... AP>
         void register_nonmember_func(std::string_view raw_name, const std::array<char, 26>& arr, Function f, const AP&... ap) {
-            if (raw_name.back()=='*') {
+            if (raw_name.back()=='*') { //注册到 模糊型容器上
                 this->wildcard_invokers_[raw_name.substr(0, raw_name.length()-1)] = { arr, std::bind(&http_router::invoke<Function, AP...>, this,
                     std::placeholders::_1, std::placeholders::_2, std::move(f), ap...) };
             }
-            else {
+            else {//注册到 完全匹配型容器上
                 this->map_invokers_[raw_name] = { arr, std::bind(&http_router::invoke<Function, AP...>, this,
                     std::placeholders::_1, std::placeholders::_2, std::move(f), ap...) };
             }
         }
 
+        /**
+         * @brief 原始路由函数的执行器，也会执行ap
+         */
         template<typename Function, typename... AP>
         void invoke(request& req, response& res, Function f, AP... ap) {
             using result_type = std::result_of_t<Function(request&, response&)>;
             std::tuple<AP...> tp(std::move(ap)...);
-            bool r = do_ap_before(req, res, tp);
+            bool r = do_ap_before(req, res, tp); //执行之间的ap
 
             if (!r)
                 return;
 
-            if constexpr(std::is_void_v<result_type>) {
+            // 如果 路由函数的的返回值类型是void
+            if constexpr(std::is_void_v<result_type>) { 
                 //business
                 f(req, res);
                 //after
@@ -207,6 +221,9 @@ namespace rojcpp { //路由用的
             }
         }
 
+        /**
+         * @brief 前置ap执行器
+         */
         template<typename Tuple>
         bool do_ap_before(request& req, response& res, Tuple& tp) {
             bool r = true;
@@ -239,6 +256,7 @@ namespace rojcpp { //路由用的
         // bool 是否匹配
         // int >=0 匹配的是哪个regex_invokers_的下标
         // -1 匹配的不是regex_invokers_
+        // TODO 没有查询 wildcard_invokers_
         auto pick(std::string_view url)-> std::pair<bool,int>
         {
             //查询regex类型的 有没有
@@ -271,9 +289,9 @@ namespace rojcpp { //路由用的
             }, std::make_index_sequence<std::tuple_size_v<Tuple>>{});
         }
 
-        typedef std::pair<std::array<char, 26>, std::function<void(request&, response&)>> invoker_function;
-        std::map<std::string_view, invoker_function> map_invokers_;
-        std::unordered_map<std::string_view, invoker_function> wildcard_invokers_; //for url/*
-        std::vector<std::pair<std::regex,invoker_function>> regex_invokers_;
+        typedef std::pair<std::array<char, 26>, std::function<void(request&, response&)>> invoker_function; //路由函数类型
+        std::map<std::string_view, invoker_function> map_invokers_;//型 路由函数容器
+        std::unordered_map<std::string_view, invoker_function> wildcard_invokers_; // /url* 型 路由函数容器
+        std::vector<std::pair<std::regex,invoker_function>> regex_invokers_; //正则型 路由函数容器
     };
 }
