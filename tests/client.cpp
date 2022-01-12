@@ -1,6 +1,7 @@
 #include <iostream>
 #include "http_client.hpp"
 #include "client_factory.hpp"
+#include "testlib.hpp"
 
 using namespace std;
 
@@ -10,6 +11,7 @@ void test_hello_world(){
     auto hc = rojcpp::client_factory::instance().new_client();
     auto res = hc->get(Server + "/helloworld");
     std::cout << res.resp_body << std::endl;
+    ok( res.resp_body == "hello world,this rojcpp Server","body ok");
     auto [header,size] =  res.resp_headers ;
     std::cout << "headers: " << std::endl;
     for(int i=0;i<=size-1;++i){
