@@ -1465,7 +1465,6 @@ private:
         const long KEEP_ALIVE_TIMEOUT_{60*10};
         std::string& static_dir_;
         bool has_shake_ = false;
-        //bool has_closed_ = false;
 
         //for writing message
         std::mutex buffers_mtx_;

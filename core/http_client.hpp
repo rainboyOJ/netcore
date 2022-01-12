@@ -108,6 +108,8 @@ class CTcpClient
                 }
                 else return {false,""};
             }
+            //log("m_recv_str_buf",m_recv_str_buf);
+            //log("recv_str",recv_str);
             return {true,recv_str};
         }
 
@@ -135,6 +137,7 @@ class CTcpClient
                         //std::cout << buf[i];
                         if( endsWith() ){
                             m_recv_str_buf = std::string(buf+i+1,buf+numBytesRead);
+                            //log("m_recv_str_buf",m_recv_str_buf);
                             return {true,recv_str};
                         }
                     }
@@ -162,7 +165,7 @@ namespace rojcpp {
     struct response_data {
         int ec;
         int status;
-        std::string_view resp_body;
+        std::string resp_body;
         std::pair<phr_header*, size_t> resp_headers;
     };
     using callback_t = std::function<void(response_data)>;
@@ -536,13 +539,13 @@ namespace rojcpp {
 
         void callback(const int ec, int status, std::string_view result) {
             if (auto sp = weak_.lock(); sp) {
-                sp->set_value({ ec, status, result, get_resp_headers() });
+                sp->set_value({ ec, status, std::string(result), get_resp_headers() });
                 weak_.reset();
                 return;
             }
 
             if (cb_) { //有回调函数
-                cb_({ ec, status, result, get_resp_headers() });
+                cb_({ ec, status, std::string(result), get_resp_headers() });
                 cb_ = nullptr;
             }
 
