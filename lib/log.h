@@ -36,7 +36,7 @@ public:
     static Log* Instance();                 //Singleton
     static void FlushLogThread();
 
-    void write(int level,bool newline ,const char *format,...); //写
+    void write(bool appendTitle,int level,bool newline ,const char *format,...); //写
     void flush();
 
     int GetLevel();
@@ -75,18 +75,32 @@ private:
     std::mutex mtx_;
 };
 
-#define LOG_BASE(level, newline,format, ...) \
+constexpr int32_t basename_index (const char * const path, const int32_t index = 0, const int32_t slash_index = -1)
+{
+     return path [index]
+         ? ( path [index] == '/'
+             ? basename_index (path, index + 1, index)
+             : basename_index (path, index + 1, slash_index)
+           )
+         : (slash_index + 1)
+     ;
+}
+
+#define  __FILENAME__ (__FILE__ + basename_index(__FILE__))
+#define LOG_BASE(appendTitle,level, newline,format, ...) \
     do {\
         Log* log = Log::Instance();\
         if (log->IsOpen() && log->GetLevel() <= level) {\
-            log->write(level, newline,format, ##__VA_ARGS__); \
+            log->write(appendTitle,level, newline,format, ##__VA_ARGS__); \
             log->flush();\
         }\
     } while(0);
 
-#define LOG_DEBUG(format, ...) do {LOG_BASE(0,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(0,1, format, ##__VA_ARGS__)} while(0);
-#define LOG_INFO(format, ...) do {LOG_BASE(1,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(1,1, format, ##__VA_ARGS__)} while(0);
-#define LOG_WARN(format, ...) do {LOG_BASE(2,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(2,1, format, ##__VA_ARGS__)} while(0);
-#define LOG_ERROR(format, ...) do {LOG_BASE(3,0,"%s %d ",__FILE__,__LINE__);LOG_BASE(3,1, format, ##__VA_ARGS__)} while(0);
+
+
+#define LOG_DEBUG(format, ...) do {LOG_BASE(1,0,0,"%s %d ",__FILENAME__,__LINE__);LOG_BASE(0,0,1, format, ##__VA_ARGS__)} while(0);
+#define LOG_INFO(format, ...) do {LOG_BASE(1,1,0,"%s %d ",__FILENAME__,__LINE__);LOG_BASE(0,1,1, format, ##__VA_ARGS__)} while(0);
+#define LOG_WARN(format, ...) do {LOG_BASE(1,2,0,"%s %d ",__FILENAME__,__LINE__);LOG_BASE(0,2,1, format, ##__VA_ARGS__)} while(0);
+#define LOG_ERROR(format, ...) do {LOG_BASE(1,3,0,"%s %d ",__FILENAME__,__LINE__);LOG_BASE(0,3,1, format, ##__VA_ARGS__)} while(0);
 
 #endif //LOG_H

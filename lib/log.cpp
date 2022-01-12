@@ -115,7 +115,7 @@ void Log::init(int level = 1, const char* path, const char* suffix,
 }
 
 //整个代码的核心
-void Log::write(int level, bool newline,const char *format, ...) {
+void Log::write(bool appendTitle,int level, bool newline,const char *format, ...) {
     struct timeval now = {0, 0};
     gettimeofday(&now, nullptr);
     time_t tSec = now.tv_sec;
@@ -161,7 +161,10 @@ void Log::write(int level, bool newline,const char *format, ...) {
 
             buff_.HasWritten(n);
         }
-        AppendLogLevelTitle_(level);
+        if( appendTitle)
+            AppendLogLevelTitle_(level);
+        else
+            buff_.Append(" : ",3);
 
         va_start(vaList, format);
         int m = vsnprintf(buff_.BeginWrite(), buff_.WritableBytes(), format, vaList);
