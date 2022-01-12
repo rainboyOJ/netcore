@@ -7,8 +7,10 @@ project(netcore)
 # 指定编译flag
 set(CMAKE_CXX_FLAGS "-std=c++17")
 
+#add_definitions("-g")
+
 # 设置宏
-#add_definitions(-D DEBUG)
+add_definitions(-D DEBUG)
 
 # 指定include 的头文件的位置
 include_directories(core)

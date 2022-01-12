@@ -288,8 +288,14 @@ namespace rojcpp {
             //auto last_len = req_.current_size();
             //last_transfer_ = last_len;
 
+            LOG_DEBUG("this pointer is %llx",static_cast<void *>(this));
             int ret = req_.parse_header_expand_last_len(last_transfer_); //解析头
+            LOG_INFO("handle_read, parse_size %d",ret);
             update_len_(last_transfer_); //已经处理的数据
+
+            LOG_DEBUG("METHOD: %.*s",req_.get_method().length(),req_.get_method().data())
+            LOG_DEBUG("URL: %.*s",req_.get_url().length(),req_.get_url().data())
+
             //printf("parse_header  result begin ========================\n");
             //for(int i = 0 ;i < req_.num_headers_;i++){
             //    for(int j =0;j < req_.headers_[i].name_len;j++)
@@ -306,13 +312,11 @@ namespace rojcpp {
                 response_back(status_type::bad_request);
                 return TO_EPOLL_WRITE; // 进入写入
             }
-
-            LOG_INFO("peek_route======================================");
             if( !peek_route() ) { //找不到对应的路由
-                LOG_INFO("peek_route======================================false" );
+                LOG_DEBUG("peek_route" );
                 return TO_EPOLL_WRITE;
             }
-                LOG_INFO("peek_route======================================true" );
+            LOG_INFO("peek_route Success" );
             
             check_keep_alive();
             if (ret == parse_status::not_complete) {
@@ -733,6 +737,7 @@ namespace rojcpp {
             assert(http_handler_);
             (*http_handler_)(req_, res_);
         }
+
         bool peek_route(){
             assert(http_handler_check_);
             return (*http_handler_check_)(req_,res_,false);
@@ -1332,7 +1337,7 @@ public:
             if (has_closed_) {
                 return;
             }
-            //reset(); //这里不reset 因为关闭的时间reset可能会导致失败 TODO
+            reset(); //这里不reset 因为关闭的时间reset可能会导致失败 TODO
             req_.close_upload_file();
             has_closed_ = true;
             has_shake_ = false;
@@ -1401,6 +1406,7 @@ private:
 
         inline int __read_all(int * saveErrno){ //读取所有能读取的数据
             int len = 0;
+            LOG_DEBUG("before Read, req_ buf current_size %d",req_.get_cur_size_());
             do {
                 int siz = recv(fd_,req_.buffer(),req_.left_size(),0);
                 if( siz <=0 ){
@@ -1416,6 +1422,7 @@ private:
             //}
             //printf("read_char end ======================= \n\n");
             LOG_INFO("__read_all read size %d",len);
+            LOG_DEBUG("after Read, req_ buf current_size %d",req_.get_cur_size_());
             return len;
         }
 

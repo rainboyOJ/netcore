@@ -6,6 +6,7 @@
 #ifdef CINATRA_ENABLE_GZIP
 #include "gzip.hpp"
 #endif
+#include "log.h"
 #include "define.h"
 #include "upload_file.hpp"
 #include "url_encode_decode.hpp"
@@ -88,6 +89,7 @@ namespace rojcpp {
 
         // Author:Rainboy
         int parse_header_expand_last_len(std::size_t exp_last_len){
+            LOG_DEBUG("last_len_ %d",last_len_);
             int ret  = parse_header(last_len_);
             last_len_ += exp_last_len;
             return ret;
@@ -233,6 +235,10 @@ namespace rojcpp {
             return &buf_[cur_size_];
         }
 
+        auto get_cur_size_ () const {
+            return cur_size_;
+        }
+
         //原始数据
         const char* data() {
             return buf_.data();
@@ -298,6 +304,7 @@ namespace rojcpp {
             is_range_resource_         = false;
             range_start_pos_           = 0;
             static_resource_file_size_ = 0;
+            last_len_ = 0;
             copy_headers_.clear();
         }
 

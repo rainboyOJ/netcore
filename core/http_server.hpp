@@ -48,7 +48,7 @@ namespace rojcpp {
                 ,4//int connPoolNum,
                 ,4//int threadNum,
                 ,true//bool openLog,
-                ,3//int logLevel,
+                ,0//int logLevel, //最低级别
                 ,1//int logQueSize
                 );
         };
@@ -136,7 +136,6 @@ namespace rojcpp {
                     int fd = epoller_->GetEventFd(i);
                     uint32_t events = epoller_->GetEvents(i);
                     if(fd == listenFd_) {       //新的连接
-                        LOG_INFO("new connection ,fd is %d",fd);
                         DealListen_();
                     }
                     // 定时事件
@@ -293,6 +292,7 @@ namespace rojcpp {
         do {
             //在listenFd_ 上创建监听
             int fd = accept(listenFd_, (struct sockaddr *)&addr, &len); 
+            LOG_DEBUG("new connection ,fd is %d",fd);
             if(fd <= 0) { return;}
             else if(HttpConn::userCount >= MAX_FD) {
                 SendError_(fd, "Server busy!");
