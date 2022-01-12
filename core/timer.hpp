@@ -1,3 +1,4 @@
+#pragma once
 #include <unistd.h>
 #include <signal.h>
 #include <functional>
@@ -16,7 +17,8 @@
 
 #include <cstring>
 #include <cassert>
-#pragma once
+
+#include "log.h"
 
 namespace rojcpp {
 
@@ -46,7 +48,8 @@ public:
         //为保证函数的可重入性，保留原来的errno
         int save_errno = errno;
         int msg = sig;
-        std::cout << "send timer out tick" << std::endl;
+        //std::cout << "send timer out tick" << std::endl;
+        LOG_DEBUG("Send Timer out tick");
         send(m_pipefd[1], (char *)&msg, 1, 0);
         errno = save_errno;
     }

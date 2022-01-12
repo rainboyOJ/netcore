@@ -145,10 +145,8 @@ namespace rojcpp {
 
                         char signals[1024];
                         int ret = recv(Timer::getInstance()->getfd0(), signals, sizeof(signals), 0);
-                        threadpool_->AddTask(
-                                std::bind(&http_server_::deal_sigal , this,int(signals[0]))
-                                );
-                        alarm(5000); //5000s 检查一次
+                        threadpool_->AddTask( std::bind(&http_server_::deal_sigal , this,int(signals[0])) );
+                        alarm(alarm_time_); //alarm_time_ 检查一次
                         //epoller_->ModFd(Timer::get->GetFd(), connEvent_ | EPOLLIN);
                         //if (false == flag)
                             //LOG_ERROR("%s", "dealclientdata failure");
@@ -275,7 +273,11 @@ namespace rojcpp {
         }
         users_[fd]->init(fd, addr); //初始化
         if( timeoutMS_ > 0) //加入 时间控制器里
-            timer_->add(fd, timeoutMS_, std::bind(&http_server_::CloseConn_, this, users_[fd].get()));
+            timer_->add(fd, timeoutMS_, [this, fd ,Conn = users_[fd].get()](){
+                        LOG_DEBUG("Timer_ Close connection, fd = %d",fd);
+                        this->CloseConn_(Conn);
+                    });
+                    //std::bind(&http_server_::CloseConn_, this, users_[fd].get()));
             //timer_->add(fd, timeoutMS_, [this,fd](){
                     //LOG_INFO("================ timer_ close");
                     //});
@@ -337,6 +339,8 @@ namespace rojcpp {
 
         transfer_type transfer_type_ = transfer_type::CHUNKED;
         bool need_response_time_ = false;
+
+        int alarm_time_{5}; //定时 alarm 5秒执行一次
 
 
     };
