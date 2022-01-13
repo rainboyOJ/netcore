@@ -1,13 +1,9 @@
 //
 // Created by xmh on 18-5-7.
 //
-
-#ifndef CINATRA_SESSION_UTILS_HPP
-#define CINATRA_SESSION_UTILS_HPP
 #pragma once
 #include <thread>
 #include "session.hpp"
-#include "request.hpp"
 namespace rojcpp {
     class session_manager {
     public:
@@ -45,6 +41,17 @@ namespace rojcpp {
             return s;
         }
 
+        /**
+        * 创建session
+        *
+        * @param name 名字
+        * @param expire 过期时间
+        * @param path 路径
+        * @param domain 域名
+        *
+        * @return shared_ptr<session>
+        *
+        */
         std::shared_ptr<session> create_session(std::string_view host, const std::string& name,
             std::time_t expire = -1, const std::string &path = "/") {
             auto pos = host.find(":");
@@ -55,12 +62,14 @@ namespace rojcpp {
             return create_session(name, expire, path, std::string(host.data(), host.length()));
         }
 
+        //通过 id 来得到 session
         std::weak_ptr<session> get_session(const std::string& id) {
             std::unique_lock<std::mutex> lock(mtx_);
             auto it = map_.find(id);
             return (it != map_.end()) ? it->second : nullptr;
         }
 
+        //删除 id 对应的session
         void del_session(const std::string& id) {
             std::unique_lock<std::mutex> lock(mtx_);
             auto it = map_.find(id);
@@ -68,6 +77,7 @@ namespace rojcpp {
                 map_.erase(it);
         }
 
+        //删除超时的session
         void check_expire() {
             if (map_.empty())
                 return;
@@ -88,6 +98,11 @@ namespace rojcpp {
             max_age_ = seconds;
         }
 
+        auto get_session_size(){
+            std::unique_lock<std::mutex> lock(mtx_);
+            return map_.size();
+        }
+
     private:
         session_manager() = default;
         session_manager(const session_manager&) = delete;
@@ -99,4 +114,3 @@ namespace rojcpp {
         std::atomic_int64_t id_ = 0;
     };
 }
-#endif //CINATRA_SESSION_UTILS_HPP
