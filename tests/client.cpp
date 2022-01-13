@@ -20,8 +20,20 @@ void test_hello_world(){
     }
 }
 
+void test_regex_route(){
+    for(int i=1;i<=5;++i){
+        auto hc = rojcpp::client_factory::instance().new_client();
+        std::string url = Server + "/regex/hello/1";
+        auto res = hc->get(url);
+        std::string msg = std::to_string(i) + " regex body ok";
+        ok(res.resp_body == "hello world,regex_route",msg.c_str());
+    }
+
+}
+
 int main(){
     test_hello_world();
+    test_regex_route();
 
     return 0;
 }
