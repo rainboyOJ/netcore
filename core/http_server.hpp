@@ -214,6 +214,11 @@ namespace rojcpp {
             }
         }
 
+        template<http_method... Is, typename Function, typename... AP>
+        void set_http_regex_handler(std::regex & name,Function&& f,const AP&&... ap){
+            http_router_.register_handler_for_regex<Is...>(name, std::forward<Function>(f), std::forward<AP>(ap)...);
+        }
+
         //设置 静态文件的目录
         void set_static_dir(std::string path) { 
             set_file_dir(std::move(path), static_dir_);

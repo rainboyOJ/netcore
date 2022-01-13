@@ -33,13 +33,17 @@ namespace rojcpp { //路由用的
         }
 
         template<http_method... Is, typename Function, typename... Ap>
-        void register_handler_for_regex(std::regex& name,Function&& f,const Ap&... ap){
+        void register_handler_for_regex(std::regex& name,Function&& f,const Ap&&... ap){
             if constexpr(sizeof...(Is) > 0) {
                 auto arr = get_method_arr<Is...>();
-                this->regex_invokers_.emplace_back(name , 
-                        { arr, std::bind(&http_router::invoke<Function, Ap...>, this,
-                            std::placeholders::_1, std::placeholders::_2, std::move(f), ap...) } 
+                this->regex_invokers_.emplace_back( name, 
+                            std::make_pair( arr, std::bind(&http_router::invoke<Function, Ap...>, this,
+                                std::placeholders::_1, std::placeholders::_2, std::move(f), ap...) )
                         );
+                //this->regex_invokers_.emplace_back(name , 
+                        //{ arr, std::bind(&http_router::invoke<Function, Ap...>, this,
+                            //std::placeholders::_1, std::placeholders::_2, std::move(f), ap...) } 
+                        //);
             }
             else 
                 this->regex_invokers_.emplace_back(name , 
