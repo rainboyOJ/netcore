@@ -12,6 +12,21 @@ set(CMAKE_CXX_FLAGS "-std=c++17")
 # 设置宏
 add_definitions(-D DEBUG)
 
+
+#set(USER_CONFIG_PATH "${PROJECT_SOURCE_DIR}/__user_config.hpp")
+#message(STATUS "户的配置文件 ${USER_CONFIG_PATH}")
+if(EXISTS ${USER_CONFIG_PATH})
+    message(STATUS "使用用户的配置文件 ${USER_CONFIG_PATH}")
+    add_definitions(-D USER_CONFIG)
+    add_compile_options(-include ${USER_CONFIG_PATH})
+else()
+    message(STATUS "使用默认配置文件 ${PROJECT_SOURCE_DIR}/__default_config.hpp")
+endif(EXISTS ${USER_CONFIG_PATH})
+
+
+
+
+
 # 指定include 的头文件的位置
 include_directories(core)
 include_directories(lib)

@@ -1,5 +1,12 @@
 #pragma once
 #include <filesystem>
+
+#ifndef USER_CONFIG
+#include "__default_config.hpp"
+#endif
+
+
+
 namespace fs = std::filesystem;
 namespace rojcpp {
     enum class content_type {

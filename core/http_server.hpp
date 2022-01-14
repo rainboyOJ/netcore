@@ -182,8 +182,9 @@ namespace rojcpp {
         void deal_sigal(int sig){
             //LOG_INFO("deal_sigal signal = %d\n",sig);
             if( sig == SIGALRM) { // 
-                //LOG_INFO("deal_sigal SIGALRM");
-                //session_manager::get().check_expire(); //检查session
+                LOG_DEBUG("deal_sigal SIGALRM");
+                LOG_DEBUG("check session_manager expire");
+                session_manager::get().check_expire(); //检查session
             }
         }
 

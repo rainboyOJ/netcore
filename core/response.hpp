@@ -8,6 +8,8 @@
 #include <vector>
 #include <string_view>
 #include <chrono>
+
+#include "define.h"
 #include "response_cv.hpp"
 #include "itoa.hpp"
 #include "utils.hpp"
@@ -17,6 +19,7 @@
 #include "picohttpparser.h"
 
 #include "session_manager.hpp"
+
 
 namespace rojcpp {
     class response {
@@ -310,7 +313,7 @@ namespace rojcpp {
                     }
                 }
             }
-            session_ = session_manager::get().create_session(domain_, CSESSIONID);
+            session_ = session_manager::get().create_session(domain_, CSESSIONID,__config__::session_expire::value);
             return session_;
         }
 
