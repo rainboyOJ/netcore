@@ -9,7 +9,15 @@
 - [markparticle/WebServer: C++ Linux WebServer服务器](https://github.com/markparticle/WebServer)
 - [zhangwenxiao/Cpp11WebServer: A High Performance HTTP Web Server in C++11](https://github.com/zhangwenxiao/Cpp11WebServer)
 
+## 使用自己的配置文件
 
+拷贝`netcore/__default_config.hpp`到自己项目目录,修改对应的值
+
+在自己的加入`CMakeLists.txt`加入如下的一行
+
+```cmake
+set(USER_CONFIG_PATH "${PROJECT_SOURCE_DIR}/__user_config.hpp")
+```
 
 
 # 使用cpp编写的oj服务器

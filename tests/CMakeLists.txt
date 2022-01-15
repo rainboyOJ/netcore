@@ -10,6 +10,7 @@ execute_process(COMMAND mysql_config --cflags
 execute_process(COMMAND mysql_config --libs
     OUTPUT_VARIABLE MYSQL_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+
 file(GLOB TESTS "*.cpp")
 foreach(f ${TESTS})
     string(REPLACE ".cpp" "" testname ${f})

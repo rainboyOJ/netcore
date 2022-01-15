@@ -12,6 +12,9 @@
 #include <cstring>
 #include <memory>
 #include "cookie.hpp"
+#include "define.h"
+
+
 namespace rojcpp {
 
     class session
@@ -21,7 +24,7 @@ namespace rojcpp {
             const std::string& path = "/", const std::string& domain = "")
         {
             id_             = uuid_str; //uuid
-            expire_         = expire == -1 ? default_expire_ : expire ;//过期 秒
+            expire_         = expire == -1 ? SESSION_DEFAULT_EXPIRE_: expire ;//过期 秒
             std::time_t now = std::time(nullptr); //创建时间
             time_stamp_     = expire_ + now;
             cookie_.set_name(name);
@@ -112,6 +115,5 @@ namespace rojcpp {
         cookie cookie_;
         bool is_update_ = true;
         std::map<std::string, std::any> data_; //一个map,存数据
-        static constexpr int default_expire_{7*24*60*60};
     };
 }

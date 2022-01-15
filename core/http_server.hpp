@@ -37,19 +37,19 @@ namespace rojcpp {
     public:
         using type = int; // fd is int
         http_server_() {
-            init(8099 //端口
-                ,2 //int trigMode, 2表示监听的时候是 LET 模式
-                ,10*1000 //int timeoutMS 超时就会断开连接
-                ,true //bool OptLinger, 优雅关闭: 直到所剩数据发送完毕或超时 
-                ,3306 //int sqlPort,
-                ,"root" //const char *sqlUser,
-                ,"root" //const char *sqlPwd,
-                ,"rojcpp" //const char *dbName,
-                ,4//int connPoolNum,
-                ,4//int threadNum,
-                ,true//bool openLog,
-                ,0//int logLevel, //最低级别
-                ,1//int logQueSize
+            init(__config__::port //端口
+                ,__config__::trigMode //int trigMode, 2表示监听的时候是 LET 模式
+                ,__config__::timeoutMS//10*1000 //int timeoutMS 超时就会断开连接
+                ,__config__::OptLinger //true //bool OptLinger, 优雅关闭: 直到所剩数据发送完毕或超时 ,__config__:://3306 //int sqlPort,
+                ,__config__::sqlPort// sql的端口
+                ,__config__::sqlUser//"root" //const char *sqlUser,
+                ,__config__::sqlPwd//"root" //const char *sqlPwd,
+                ,__config__::dbName//"rojcpp" //const char *dbName,
+                ,__config__::connPoolNum//4//int connPoolNum,
+                ,__config__::threadNum//4//int threadNum,
+                ,__config__::openLog//true//bool openLog,
+                ,__config__::logLevel//0//int logLevel, //最低级别
+                ,__config__::logQueSize//1//int logQueSize
                 );
         };
 
@@ -146,7 +146,7 @@ namespace rojcpp {
                         char signals[1024];
                         int ret = recv(Timer::getInstance()->getfd0(), signals, sizeof(signals), 0);
                         threadpool_->AddTask( std::bind(&http_server_::deal_sigal , this,int(signals[0])) );
-                        alarm(alarm_time_); //alarm_time_ 检查一次
+                        alarm(__config__::alarm_time); //alarm_time_ 检查一次
                         //epoller_->ModFd(Timer::get->GetFd(), connEvent_ | EPOLLIN);
                         //if (false == flag)
                             //LOG_ERROR("%s", "dealclientdata failure");
@@ -325,8 +325,8 @@ namespace rojcpp {
         long keep_alive_timeout_ = 60; //max request timeout 60s
 
         http_router http_router_;
-        std::string static_dir_ = fs::absolute("www").string(); //default
-        std::string upload_dir_ = fs::absolute("www").string(); //default
+        std::string static_dir_ = fs::absolute(__config__::static_dir).string(); //default
+        std::string upload_dir_ = fs::absolute(__config__::upload_dir).string(); //default
         std::time_t static_res_cache_max_age_ = 0;
 
         bool enable_timeout_ = true;
@@ -345,9 +345,6 @@ namespace rojcpp {
 
         transfer_type transfer_type_ = transfer_type::CHUNKED;
         bool need_response_time_ = false;
-
-        int alarm_time_{5}; //定时 alarm 5秒执行一次
-
 
     };
 

@@ -313,7 +313,7 @@ namespace rojcpp {
                     }
                 }
             }
-            session_ = session_manager::get().create_session(domain_, CSESSIONID,__config__::session_expire::value);
+            session_ = session_manager::get().create_session(domain_, CSESSIONID,__config__::session_expire);
             return session_;
         }
 
