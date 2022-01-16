@@ -557,6 +557,7 @@ namespace rojcpp {
                 if (content_type.find("application/x-www-form-urlencoded") != std::string_view::npos) {
                     return content_type::urlencoded;
                 }
+                //Content-Type:	multipart/form-data; boundary=----WebKitFormBoundaryX4zzs3sYStDhVBUX
                 else if (content_type.find("multipart/form-data") != std::string_view::npos) {
                     auto size = content_type.find("=");
                     auto bd = content_type.substr(size + 1, content_type.length() - size);
@@ -564,6 +565,7 @@ namespace rojcpp {
                         bd = bd.substr(1, bd.length() - 2);
                     }
                     std::string boundary(bd.data(), bd.length());
+                    //根据协议 在body 里的分界开头多个两个--
                     multipart_parser_.set_boundary("\r\n--" + std::move(boundary));
                     return content_type::multipart;
                 }
@@ -753,7 +755,7 @@ namespace rojcpp {
                 //part的开始 
                 //on_part_begin 其时在一个part在头解析结束时候的动作
                 multipart_parser_.on_part_begin = [this](const multipart_headers & headers) {
-                    LOG_INFO("=============== on_part_begin ");
+                    LOG_DEBUG("=============== on_part_begin ");
                     req_.set_multipart_headers(headers); //加头 TODO 加到req_的哪里
                     auto filename = req_.get_multipart_field_name("filename");
                     is_multi_part_file_ = req_.is_multipart_file(); //是否是文件
@@ -764,6 +766,7 @@ namespace rojcpp {
                     }                        
                     if(is_multi_part_file_)
                     {
+                        LOG_DEBUG("is_multi_part_file_");
                         auto ext = get_extension(filename);
                         try {
                             auto tp = std::chrono::high_resolution_clock::now(); //弄时间 作为名字
@@ -775,6 +778,7 @@ namespace rojcpp {
                                 name = static_dir_ + "/" + name;
                             }
                             
+                            LOG_DEBUG("open_upload_file %s",name.c_str());
                             req_.open_upload_file(name); //打开这个文件
                         }
                         catch (const std::exception& ex) {
@@ -789,7 +793,7 @@ namespace rojcpp {
                 };
                 //part的的数据
                 multipart_parser_.on_part_data = [this](const char* buf, size_t size) {
-                    LOG_INFO("=============== on_part_data ");
+                    LOG_DEBUG("=============== on_part_data ");
                     if (req_.get_state() == data_proc_state::data_error) {
                         return;
                     }
@@ -828,6 +832,9 @@ namespace rojcpp {
                 };        
         }
 
+        /**
+         * @return 返回值是否有错误
+         */
         //解析 multipart
         bool parse_multipart(size_t size, std::size_t length) {
             if (length == 0)
@@ -844,7 +851,7 @@ namespace rojcpp {
             } while (fed < bufsize && !multipart_parser_.stopped());
 
             if (multipart_parser_.has_error()) {
-                //LOG_WARN << multipart_parser_.get_error_message();
+                LOG_DEBUG("multipart parser error message %s",multipart_parser_.get_error_message());
                 req_.set_state(data_proc_state::data_error);
                 return true;
             }
@@ -855,7 +862,7 @@ namespace rojcpp {
 
         //处理multipart
         bool handle_multipart() {
-            LOG_INFO("=====================handle_multipart=====================");
+            LOG_DEBUG("=====================handle_multipart=====================");
             if (upload_check_) {
                 bool r = (*upload_check_)(req_, res_);
                 if (!r) {
@@ -865,6 +872,8 @@ namespace rojcpp {
                 }                    
             }
 
+            //LOG_DEBUG("req_ current_size %lld",req_.current_size());
+            //LOG_DEBUG("req_ header_len %lld",req_.header_len());
             bool has_error = parse_multipart(req_.header_len(), req_.current_size() - req_.header_len());
             LOG_INFO("has_error %d",has_error);
             if (has_error) {

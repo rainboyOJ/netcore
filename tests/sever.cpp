@@ -68,6 +68,11 @@ int main(){
                 res.set_status_and_content(status_type::ok,"yes,now logined",req_content_type::string);
             });
 
+    //上传文件
+    Server.set_http_handler<POST>("/upload", [](request& req,response& res){
+                res.set_status_and_content(status_type::ok,"yes,upload success!",req_content_type::string);
+            });
+
 
 
 

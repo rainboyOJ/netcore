@@ -7,10 +7,16 @@ project(netcore)
 # 指定编译flag
 set(CMAKE_CXX_FLAGS "-std=c++17")
 
-#add_definitions("-g")
+if(${CMAKE_BUILD_TYPE} EQUAL "debug")
+    add_definitions("-g")
+endif(${CMAKE_BUILD_TYPE} EQUAL "debug")
+
+
 
 # 设置宏
 add_definitions(-D DEBUG)
+
+
 
 
 #set(USER_CONFIG_PATH "${PROJECT_SOURCE_DIR}/__user_config.hpp")

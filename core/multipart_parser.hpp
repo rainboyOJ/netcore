@@ -4,17 +4,6 @@
 #include <string>
 #include <stdexcept>
 #include <cstring>
-//------FormBoundaryShouldDifferAtRuntime
-//Content-Disposition: form-data; name="ranboy"
-//
-//lvx
-//------FormBoundaryShouldDifferAtRuntime
-//Content-Disposition: form-data; name="file"; filename="keyboard-sliper.jpg"
-//Content-Type: image/jpeg
-//
-//[message-part-body; type: "image/jpeg", size: 73523 bytes]
-//------FormBoundaryShouldDifferAtRuntime--
-//[post 提交之 multipart/form-data; boundary= ... - 柳帅 - 博客园](https://www.cnblogs.com/angle6-liu/p/11724850.html)
 
 namespace rojcpp {
     class multipart_parser {
@@ -22,14 +11,18 @@ namespace rojcpp {
         typedef void(*Callback)(const char *buffer, size_t start, size_t end, void *userData);
 
     public:
-        Callback onPartBegin;   //hook 
-        Callback onHeaderField;
-        Callback onHeaderValue;
-        Callback onHeaderEnd;
-        Callback onHeadersEnd;
-        Callback onPartData;
-        Callback onPartEnd;
-        Callback onEnd;
+        //钩子函数
+        Callback onHeaderField;     ///头的名
+        Callback onHeaderValue;     ///头的值
+        Callback onHeaderEnd;       ///头的结
+
+        Callback onHeadersEnd;      ///所有头的结束
+
+        Callback onPartBegin;       ///部分中的开始
+        Callback onPartData;        ///部分中的数据
+        Callback onPartEnd;         ///部分结束
+
+        Callback onEnd;             ///全部结束
         void *userData; //这是一个指针
 
         multipart_parser() { //构造函数
@@ -50,20 +43,24 @@ namespace rojcpp {
 
         void reset() {
             delete[] lookbehind;
-            state = PARSE_ERROR;
+            state           = PARSE_ERROR;
             boundary.clear();
-            boundaryData = boundary.c_str();
-            boundarySize = 0;
-            lookbehind = nullptr;
-            lookbehindSize = 0;
-            flags = 0;
-            index = 0;
+            boundaryData    = boundary.c_str();
+            boundarySize    = 0;
+            lookbehind      = nullptr;
+            lookbehindSize  = 0;
+            flags           = 0;
+            index           = 0;
             headerFieldMark = UNMARKED;
             headerValueMark = UNMARKED;
-            partDataMark = UNMARKED;
-            errorReason = "Parser uninitialized.";
+            partDataMark    = UNMARKED;
+            errorReason     = "Parser uninitialized.";
         }
 
+        /**
+         * @brief 设置 boundary
+         * \r\n----WebKitFormBoundaryX4zzs3sYStDhVBUX
+         */
         void set_boundary(std::string&& boundary) {
             reset();
             this->boundary = std::move(boundary);
@@ -76,20 +73,31 @@ namespace rojcpp {
             errorReason = "No error.";
         }
 
-        //核心函数
+        /**
+         * 喂,食物是mulpart的数据
+         * @brief 核心函数
+         *
+         * @agrument buffer 数据起始指针
+         * @agrument len 处理的长度
+         *
+         * @return 处理的数据的buffer的哪个位置停止的
+         */
         size_t feed(const char *buffer, size_t len) {
             if (state == PARSE_ERROR || len == 0) {
                 return 0;
             }
 
-            State state = this->state;
-            int flags = this->flags;
-            size_t prevIndex = this->index;
-            size_t index = this->index;
-            size_t boundaryEnd = boundarySize - 1;
+            State state        = this->state;
+            int flags          = this->flags;
+            size_t prevIndex   = this->index;
+            size_t index       = this->index;
+            size_t boundaryEnd = this->boundarySize - 1;
+            //拷贝 对应的状态值
+
             size_t i;
             char c, cl;
 
+            //核心状态机
             for (i = 0; i < len; i++) {
                 c = buffer[i];
 
@@ -97,10 +105,10 @@ namespace rojcpp {
                 case PARSE_ERROR:
                     return i;
                 case START:
-                    index = 0;
+                    index = 0;      //起始时 index 为 0
                     state = START_BOUNDARY;
-                case START_BOUNDARY:
-                    if (index == boundarySize - 2) {
+                case START_BOUNDARY: //这里的index表示处理的字符的位置
+                    if (index == boundarySize - 2) { //去除2 表示读取时 其实不是从\r\n开始读取的
                         if (c != CR) {
                             setError("Malformed. Expected CR after boundary.");
                             return i;
@@ -118,17 +126,17 @@ namespace rojcpp {
                         state = HEADER_FIELD_START;
                         break;
                     }
-                    if (c != boundary[index + 2]) {
+                    if (c != boundary[index + 2]) {  //不是对应的boundary的值
                         setError("Malformed. Found different boundary data than the given one.");
                         return i;
                     }
-                    index++;
+                    index++; // 增加1
                     break;
-                case HEADER_FIELD_START:
+                case HEADER_FIELD_START: // 头开始了
                     state = HEADER_FIELD;
                     headerFieldMark = i;
-                    index = 0;
-                case HEADER_FIELD:
+                    index = 0;      // 指示器置0
+                case HEADER_FIELD:  // 
                     if (c == CR) {
                         headerFieldMark = UNMARKED;
                         state = HEADERS_ALMOST_DONE;
@@ -136,12 +144,12 @@ namespace rojcpp {
                     }
 
                     index++;
-                    if (c == HYPHEN) {
+                    if (c == HYPHEN) { // - 不做处理
                         break;
                     }
 
-                    if (c == COLON) {
-                        if (index == 1) {
+                    if (c == COLON) { // : 
+                        if (index == 1) { //只有 : 没有header_name
                             // empty header field
                             setError("Malformed first header name character.");
                             return i;
@@ -153,12 +161,12 @@ namespace rojcpp {
 
                     cl = lower(c);
                     if (cl < 'a' || cl > 'z') {
-                        setError("Malformed header name.");
+                        setError("Malformed header name."); // 名字必须是字母
                         return i;
                     }
                     break;
                 case HEADER_VALUE_START:
-                    if (c == SPACE) {
+                    if (c == SPACE) { //过滤空格
                         break;
                     }
 
@@ -232,8 +240,8 @@ namespace rojcpp {
         static const char CR = 13;
         static const char LF = 10;
         static const char SPACE = 32;
-        static const char HYPHEN = 45;
-        static const char COLON = 58;
+        static const char HYPHEN = 45; // -
+        static const char COLON = 58;  // :
         static const size_t UNMARKED = (size_t)-1;
 
         enum State {
@@ -258,19 +266,21 @@ namespace rojcpp {
         };
 
         void resetCallbacks() {
-            onPartBegin = nullptr;
+            onPartBegin   = nullptr;
             onHeaderField = nullptr;
             onHeaderValue = nullptr;
-            onHeaderEnd = nullptr;
-            onHeadersEnd = nullptr;
-            onPartData = nullptr;
-            onPartEnd = nullptr;
-            onEnd = nullptr;
-            userData = nullptr;
+            onHeaderEnd   = nullptr;
+            onHeadersEnd  = nullptr;
+            onPartData    = nullptr;
+            onPartEnd     = nullptr;
+            onEnd         = nullptr;
+            userData      = nullptr;
         }
 
+        /**
+         * @brief 根据BoudaryData(boundary的值),把boundaryIndex数组的对应位置设置为true
+         */
         void indexBoundary() { 
-            // 把对应的Boundary指明数组根据BoudaryData,对应设置为true
             const char *current;
             const char *end = boundaryData + boundarySize;
 
@@ -328,6 +338,18 @@ namespace rojcpp {
             errorReason = message;
         }
 
+        /**
+         * @brief 解析 body 部分
+         * @agrument prevIndex  
+         * @agrument index      只有在header name里 和boundary 从会增加
+         * @agrument buffer     处理的数据的指针
+         * @agrument len        长度
+         * @agrument boundaryEnd    boundary的长度???
+         * @agrument i              处理到的i的位置
+         * @agrument c              处理到的字符
+         * @agrument state          状态
+         * @agrument flag           ??
+         */
         void processPartData(size_t &prevIndex, size_t &index, const char *buffer,
             size_t len, size_t boundaryEnd, size_t &i, char c, State &state, int &flags)
         {
@@ -445,19 +467,19 @@ namespace rojcpp {
             }
         }
 
-        std::string boundary;
-        const char *boundaryData;
-        size_t boundarySize;
-        bool boundaryIndex[256];
-        char *lookbehind; // ?
-        size_t lookbehindSize;
-        State state;
-        int flags;
-        size_t index;
-        size_t headerFieldMark;
-        size_t headerValueMark;
-        size_t partDataMark;
-        const char *errorReason;
+        std::string boundary;       //boundary本身
+        const char* boundaryData;   //boundary数据指针
+        size_t      boundarySize;   //boundary大小
+        bool        boundaryIndex[256]; //boundary的标明器
+        char*       lookbehind; // ?
+        size_t      lookbehindSize;
+        State       state;          //解析的状态
+        int         flags;
+        size_t      index;
+        size_t      headerFieldMark; //在buffer_ heaer起始的位置
+        size_t      headerValueMark; //headerValue 起始的位置
+        size_t      partDataMark;    //part起始位置
+        const char* errorReason;    //解析出现错误的原因
     };
 }
 #endif /* _MULTIPART_PARSER_H_ */
