@@ -51,7 +51,7 @@ namespace rojcpp {
 
         virtual bool IsKeepAlive() const = 0;// TODO 
 
-        bool isET{true};
+        //bool isET{true};
         //static const char* srcDir;
         static std::atomic<int> userCount; // 统计有少个用户连接
 
@@ -287,25 +287,27 @@ namespace rojcpp {
         bool handle_read(std::size_t bytes_transferred) { 
             //auto last_len = req_.current_size();
             //last_transfer_ = last_len;
-
-            LOG_DEBUG("this pointer is %llx",static_cast<void *>(this));
+            //LOG_DEBUG("this pointer is %llx",static_cast<void *>(this));
             int ret = req_.parse_header_expand_last_len(last_transfer_); //解析头
             LOG_INFO("handle_read, parse_size %d",ret);
             update_len_(last_transfer_); //已经处理的数据
-
             LOG_DEBUG("METHOD: %.*s",req_.get_method().length(),req_.get_method().data())
             LOG_DEBUG("URL: %.*s",req_.get_url().length(),req_.get_url().data())
+#ifdef DEBUG // 定义为调试模式
 
             //printf("parse_header  result begin ========================\n");
-            //for(int i = 0 ;i < req_.num_headers_;i++){
-            //    for(int j =0;j < req_.headers_[i].name_len;j++)
-            //        printf("%c",req_.headers_[i].name[j]);
-            //    printf(" : ");
-            //    for(int j =0;j < req_.headers_[i].value_len;j++)
-            //        printf("%c",req_.headers_[i].value[j]);
-            //    printf("\n");
-            //}
+            LOG_DEBUG("====== The request headers were : ======")
+            auto [_headers_,_num_headers_] = req_.get_headers();
+            for(int i = 0 ;i < _num_headers_;i++){
+                for(int j =0;j < _headers_[i].name_len;j++)
+                    LOG_DEBUG_NONEWLINE("%c",_headers_[i].name[j]);
+                LOG_DEBUG_NONEWLINE(" ");
+                for(int j =0;j < _headers_[i].value_len;j++)
+                    LOG_DEBUG_NONEWLINE("%c",_headers_[i].value[j]);
+                LOG_DEBUG_NONEWLINE("\n");
+            }
             //printf("parse_header  result end ========================\n");
+#endif
 
 
             if (ret == parse_status::has_error) { 
@@ -313,10 +315,10 @@ namespace rojcpp {
                 return TO_EPOLL_WRITE; // 进入写入
             }
             if( !peek_route() ) { //找不到对应的路由
-                LOG_DEBUG("peek_route" );
+                LOG_DEBUG("peek_route Failed" );
                 return TO_EPOLL_WRITE;
             }
-            LOG_INFO("peek_route Success" );
+            LOG_DEBUG("peek_route Success" );
             
             check_keep_alive();
             if (ret == parse_status::not_complete) {
@@ -837,6 +839,7 @@ namespace rojcpp {
          */
         //解析 multipart
         bool parse_multipart(size_t size, std::size_t length) {
+            LOG_DEBUG("Run parse_multipart size %d,length %d",size,length);
             if (length == 0)
                 return false;
 
@@ -867,7 +870,7 @@ namespace rojcpp {
                 bool r = (*upload_check_)(req_, res_);
                 if (!r) {
                     Close();
-                    response_back(status_type::bad_request, "upload_check_ error at line 940");
+                    response_back(status_type::bad_request, "upload_check_ error at line "+ std::to_string(__LINE__));
                     return TO_EPOLL_WRITE;
                 }                    
             }
@@ -875,20 +878,19 @@ namespace rojcpp {
             //LOG_DEBUG("req_ current_size %lld",req_.current_size());
             //LOG_DEBUG("req_ header_len %lld",req_.header_len());
             bool has_error = parse_multipart(req_.header_len(), req_.current_size() - req_.header_len());
-            LOG_INFO("has_error %d",has_error);
+            LOG_DEBUG("has_error %d",has_error);
             if (has_error) {
                 response_back(status_type::bad_request, "mutipart error");
                 return TO_EPOLL_WRITE;
             }
 
-            LOG_INFO("req_.has_recieved_all_part() %d",req_.has_recieved_all_part());
-            if (req_.has_recieved_all_part()) {
+            LOG_DEBUG("req_.has_recieved_all_part() %d",req_.has_recieved_all_part());
+            if (req_.has_recieved_all_part()) { //接收完全部的数据,结束
                 call_back();
                 return TO_EPOLL_WRITE;
             }
             else {
                 req_.set_current_size(0);
-                //do_read_multipart();
                 continue_work_ = &connection::do_read_multipart;
                 return TO_EPOLL_READ;
             }
@@ -896,7 +898,7 @@ namespace rojcpp {
 
         //读multipart
         bool do_read_multipart() {
-
+            LOG_DEBUG("Run Function do_read_multipart");
             req_.fit_size();
             //auto self = this->shared_from_this();
             //if (ec) {
@@ -907,6 +909,7 @@ namespace rojcpp {
             //}
 
             bool has_error = parse_multipart(0, last_transfer_);
+            LOG_DEBUG("has_error %d",has_error);
 
             if (has_error) { //parse error
                 keep_alive_ = false;
@@ -1391,7 +1394,7 @@ public:
         }
 
         virtual bool IsKeepAlive() const override{
-            LOG_INFO("keep_alive_ %d\n",keep_alive_);
+            //LOG_INFO("keep_alive_ %d\n",keep_alive_);
             return keep_alive_;
         }
 
@@ -1416,6 +1419,7 @@ private:
         inline int __read_all(int * saveErrno){ //读取所有能读取的数据
             int len = 0;
             LOG_DEBUG("before Read, req_ buf current_size %d",req_.get_cur_size_());
+            //一直读取,直到不能再读读取了位置
             do {
                 int siz = recv(fd_,req_.buffer(),req_.left_size(),0);
                 if( siz <=0 ){
@@ -1424,7 +1428,8 @@ private:
                 }
                 len += siz; //读取的字节数
                 req_.update_and_expand_size(siz); // 更新和拓展req_的bufer
-            }while(isET);
+                if(req_.left_size() == 0) break;  // 没有空间了
+            }while(true); //isLT
             //printf("read_char begin ======================= \n\n");
             //for(auto i=req_.buf_.data(),j=i;i-j < len;i++ ){
                 //printf("%c",*i);

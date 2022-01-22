@@ -475,6 +475,16 @@ namespace rojcpp {
             return upload(std::move(uri), std::move(filename), 0, std::forward<_Callable_t>(cb), seconds);
         }
 
+        /**
+         * @brief 上传size个字符的字符,当成文件上传
+         */
+        template<typename _Callable_t>
+        auto upload_string(std::string uri, std::string filename,std::size_t size, _Callable_t&& cb, size_t seconds = 60) {
+            multipart_str_ = std::move(filename);
+            memFileSize = size;
+            return async_request(http_method::POST, uri, std::forward<_Callable_t>(cb), req_content_type::multipart, seconds, "");
+        }
+
         template<typename _Callable_t>
         auto upload(std::string uri, std::string filename, size_t start, _Callable_t&& cb, size_t seconds = 60) {
             multipart_str_ = std::move(filename);
@@ -617,6 +627,22 @@ namespace rojcpp {
 
         void send_multipart_msg(const context& ctx) {
             auto filename = std::move(multipart_str_);
+            if(memFileSize != 0){ // 此时生成数据
+                auto left_file_size = memFileSize;
+                header_str_.append("Content-Type: multipart/form-data; boundary=").append(BOUNDARY);
+                auto multipart_str = multipart_file_start(fs::path(filename).filename().string());
+                auto write_str = build_write_msg(ctx, total_multipart_size(left_file_size, multipart_str.size()));
+                write_str.append(multipart_str);
+                multipart_str_ = std::move(write_str);
+                //multipart_str_. append()
+                for(std::size_t i = 0 ;i < memFileSize ;++i)
+                    multipart_str_.append("a");
+                multipart_str_.append(MULTIPART_END);
+                //log("multipart_str_",multipart_str_);
+                send_mem_data(); //改成发送内存数据
+                return;
+            }
+
             auto file = std::make_shared<std::ifstream>(filename, std::ios::binary);
             if (!file) {
                 callback(EC_invalid_argument, INVALID_FILE_PATH);
@@ -641,6 +667,7 @@ namespace rojcpp {
             auto write_str = build_write_msg(ctx, total_multipart_size(left_file_size, multipart_str.size()));
             write_str.append(multipart_str);
             multipart_str_ = std::move(write_str);
+            log("multipart_str_",multipart_str_);
             send_file_data(std::move(file));
         }
 
@@ -1037,6 +1064,19 @@ namespace rojcpp {
                 }
             });
         }
+        void send_mem_data(){
+            //multipart_str_.resize(size);
+            //std::fill(multipart_str_.begin(),multipart_str_.end(),'a');
+            Write(multipart_str_, [this](int ec,std::size_t length){
+                    if(!ec){
+                        multipart_str_.clear();
+                    }
+                    else {
+                        on_chunk_(ec, "send failed");
+                        close();
+                    }
+                });
+        }
 
         std::string multipart_file_start(std::string filename) {
             std::string multipart_start;
@@ -1124,6 +1164,7 @@ namespace rojcpp {
         std::string last_domain_;
         std::promise<bool> read_close_finished_;
         std::future<bool> future_;
+        long long memFileSize{-1}; //-1表示上传的文件是普通文件,否则是上传的生成的字符文件的大小
 
         std::shared_ptr<std::promise<response_data>> promise_ = nullptr;
         std::weak_ptr<std::promise<response_data>> weak_;

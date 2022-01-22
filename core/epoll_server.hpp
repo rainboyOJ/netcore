@@ -295,8 +295,10 @@ void epoll_server<HttpConn>::OnProcess(HttpConn* client) {
     if(client->process()) { 
         // client->process返回true的时候表示已经读取完毕想要的数据
         // 转入 写的阶段,否则继续读取
+        LOG_DEBUG("After client->process() set server continue to write.");
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLOUT);
     } else {
+        LOG_DEBUG("After client->process() set server continue to read.");
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLIN);
     }
 }
@@ -312,12 +314,13 @@ void epoll_server<HttpConn>::OnWrite_(HttpConn* client) {
         // 主要看 connection 的process 是如果工作的
         if( client->has_continue_workd() ) { 
             /* 继续传输 */
+            LOG_DEBUG("client has_continue_workd,so process it");
             OnProcess(client);
             return;
         }
         /* 传输完成 */
         //是否保持长连接?
-        LOG_INFO("trans ok IsKeepAlive %d",client->IsKeepAlive()); 
+        LOG_DEBUG("trans ok IsKeepAlive %d",client->IsKeepAlive()); 
         if(client->IsKeepAlive()) {
             OnProcess(client);
             return;

@@ -102,9 +102,7 @@ namespace rojcpp {
             num_headers_ = sizeof(headers_) / sizeof(headers_[0]); // 
             header_len_ = phr_parse_request(buf_.data(), cur_size_, &method_,
                 &method_len_, &url_, &url_len_,
-                &minor_version_, headers_, &num_headers_, last_len); //这里有一个疑问，如果修改了buf_.data
-                                                                    //的大小，那么vector size等会变吗?
-                                                                    //
+                &minor_version_, headers_, &num_headers_, last_len);
 
             if (cur_size_ > max_header_len_) { //header buff_的最大空间,那它不应该在解析前判断吗? TODO
                 return -1;
@@ -185,6 +183,9 @@ namespace rojcpp {
             return (total_len() <= current_size());
         }
 
+        /**
+         * @brief 读取到所有的 multipart 数据
+         */
         bool has_recieved_all_part() {
             return (body_len_ == cur_size_ - header_len_);
         }
@@ -417,9 +418,9 @@ namespace rojcpp {
 
             num_headers_ = copy_headers_.size();
             for (size_t i = 0; i < num_headers_; i++) {
-                headers_[i].name = copy_headers_[i].first.data();
-                headers_[i].name_len = copy_headers_[i].first.size();
-                headers_[i].value = copy_headers_[i].second.data();
+                headers_[i].name      = copy_headers_[i].first.data();
+                headers_[i].name_len  = copy_headers_[i].first.size();
+                headers_[i].value     = copy_headers_[i].second.data();
                 headers_[i].value_len = copy_headers_[i].second.size();
             }
             return { headers_ , num_headers_ };
@@ -963,7 +964,7 @@ namespace rojcpp {
             }
         }
 
-        constexpr const static size_t MaxSize = 3 * 1024 * 1024; // 3mb
+        constexpr const static size_t MaxSize = __config__::maxRequestSize;
         conn_type conn_;
         response& res_;
         std::vector<char> buf_;
