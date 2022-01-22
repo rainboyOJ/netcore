@@ -41,6 +41,7 @@ include_directories(lib/font)
 # 添加代码
 aux_source_directory(lib DIR_SRCS)
 aux_source_directory(core CORE_SRC)
+aux_source_directory(core/hs_utils HTTPSERVER_UTILS_SRC)
 
 # 设置链接库路径
 
@@ -48,7 +49,7 @@ aux_source_directory(core CORE_SRC)
 # 并将名称保存到 DIR_SRCS 变量
 
 #add_executable(test ${DIR_SRCS})
-add_library(netcore STATIC ${DIR_SRCS} ${CORE_SRC})
+add_library(netcore STATIC ${DIR_SRCS} ${CORE_SRC} ${HTTPSERVER_UTILS_SRC})
 
 
 add_subdirectory(tests)

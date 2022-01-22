@@ -14,8 +14,8 @@
 
 #include "threadpool.h"
 #include "sqlconnpool.h"
-#include "epoller.hpp"
-#include "heaptimer.hpp"
+#include "epoller.h"
+#include "heaptimer.h"
 
 namespace rojcpp {
     
