@@ -98,6 +98,7 @@ constexpr int32_t basename_index (const char * const path, const int32_t index =
 
 
 
+#define LOG_DEBUG_NONEWLINE(format, ...) do {LOG_BASE(0,0,0, format, ##__VA_ARGS__)} while(0);
 #define LOG_DEBUG(format, ...) do {LOG_BASE(1,0,0,"%s %d ",__FILENAME__,__LINE__);LOG_BASE(0,0,1, format, ##__VA_ARGS__)} while(0);
 #define LOG_INFO(format, ...) do {LOG_BASE(1,1,0,"%s %d ",__FILENAME__,__LINE__);LOG_BASE(0,1,1, format, ##__VA_ARGS__)} while(0);
 #define LOG_WARN(format, ...) do {LOG_BASE(1,2,0,"%s %d ",__FILENAME__,__LINE__);LOG_BASE(0,2,1, format, ##__VA_ARGS__)} while(0);

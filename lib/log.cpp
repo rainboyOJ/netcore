@@ -163,7 +163,7 @@ void Log::write(bool appendTitle,int level, bool newline,const char *format, ...
         }
         if( appendTitle)
             AppendLogLevelTitle_(level);
-        else
+        else if( newline == true)
             buff_.Append(" : ",3);
 
         va_start(vaList, format);
