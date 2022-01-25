@@ -14,6 +14,7 @@
 //#include "url_encode_decode.hpp"
 #include "http_cache.hpp"
 #include "timer.hpp" //定时器
+#include "hs_utils.h"
 
 #ifdef __USE_SESSION__ //暂时没有实现这个功能
 #include "session_manager.hpp"
@@ -77,12 +78,6 @@ namespace rojcpp {
             }
         }
 
-        // 得到发送文件的数据
-        std::string get_send_data(request& req, const size_t len) ;
-        void write_chunked_header(request& req, std::shared_ptr<std::ifstream> in, std::string_view mime);
-        void write_chunked_body(request& req) ;
-        void write_ranges_header(request& req, std::string_view mime, std::string filename, std::string file_size) ;
-        void write_ranges_data(request& req) ;
         void set_static_res_handler();
 
         void init_conn_callback() {
@@ -342,7 +337,6 @@ namespace rojcpp {
         size_t max_header_len_;
         check_header_cb check_headers_;
 
-        transfer_type transfer_type_ = transfer_type::CHUNKED;
         bool need_response_time_ = false;
 
     };

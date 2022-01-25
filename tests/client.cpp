@@ -28,12 +28,19 @@ void test_regex_route(){
         std::string msg = std::to_string(i) + " regex body ok";
         ok(res.resp_body == "hello world,regex_route",msg.c_str());
     }
+}
 
+void test_upload_file(){
+    auto hc = rojcpp::client_factory::instance().new_client();
+    //auto res = 
+    //hc->upload_string(Server+"/upload", "test.cpp",10,nullptr);
+    hc->upload_string(Server+"/upload", "test.cpp",5_MB,nullptr); //5MB
 }
 
 int main(){
-    test_hello_world();
-    test_regex_route();
+    //test_hello_world();
+    //test_regex_route();
+    test_upload_file();
 
     return 0;
 }

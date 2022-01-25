@@ -209,11 +209,6 @@ namespace rojcpp {
     constexpr inline auto TRACE   = http_method::TRACE;
     constexpr inline auto OPTIONS = http_method::OPTIONS;
 
-    enum class transfer_type {
-        CHUNKED,
-        ACCEPT_RANGES
-    };
-
     inline constexpr std::string_view method_name(http_method mthd) {
         switch (mthd)
         {

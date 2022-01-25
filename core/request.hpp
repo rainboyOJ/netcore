@@ -1002,9 +1002,9 @@ namespace rojcpp {
         size_t max_header_len_ = 1024 * 1024;
         check_header_cb check_headers_;
 
-        data_proc_state state_ = data_proc_state::data_begin;
-        std::string_view part_data_;
+        data_proc_state state_  = data_proc_state::data_begin;
         content_type http_type_ = content_type::unknown;
+        std::string_view part_data_;
 
         std::map<std::string, std::string> multipart_headers_;
         std::string last_multpart_key_;

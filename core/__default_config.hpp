@@ -6,6 +6,12 @@
 #include <string_view>
 using namespace std::literals;
 
+//下载类型
+enum class transfer_type {
+    CHUNKED,
+    ACCEPT_RANGES
+};
+
 
 constexpr std::size_t operator"" _MB ( unsigned long long const x ){
     return 1024L*1024L*x;
@@ -34,6 +40,10 @@ struct __config__{
 
     //其它配置
     static constexpr std::size_t maxRequestSize = 20_MB;
+    static constexpr std::size_t staticResCacheMaxAge = 0;
+
+    //下载类型
+    static constexpr transfer_type transfer_type_ = transfer_type::ACCEPT_RANGES;
 };
 
 

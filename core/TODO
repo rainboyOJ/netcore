@@ -19,8 +19,11 @@ need_cache 的作用是什么？
 
 [ ] 到底是哪里修改的req_的 is_chunked ?
 [ ] 什么是octet_stream 请求 ?
+[ ] http_cache 是如何工作的
+[ ] gzip 的使用
 
 [ ] 图片 不使用直接使用硬盘 直接存在内存里
+
 
 
 [ ] 把图片上传到sm.ms 

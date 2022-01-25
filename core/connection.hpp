@@ -171,33 +171,23 @@ namespace rojcpp {
             }else{
                 chunked_header_ = http_range_chunk_header + "Content-Type: " + std::string(mime.data(), mime.length()) + "\r\n\r\n";
             }
-            LOG_INFO("========= connection write_chunked_header == ");
+            LOG_DEBUG("========= connection write_chunked_header == ");
             res_.response_str() = std::move(chunked_header_);
             req_.set_state(data_proc_state::data_continue); //设置data_continue 会读取req的
             //设置下一个任务
             continue_work_ = &connection::continue_write_then_route; //
         }
 
-        //写一个 ranges 头 TODO ？
-        void write_ranges_header(std::string header_str) {
-            chunked_header_ = std::move(header_str); //reuse the variable
-            //TODO async_write
-            //boost::asio::async_write(socket(),
-                //boost::asio::buffer(chunked_header_),
-                //[this, self = this->shared_from_this()](const int& ec, std::size_t bytes_transferred) {
-                //handle_chunked_header(ec);
-            //});
-            async_write(chunked_header_);
-            //handle_chunked_header(0);
+        //写一个 ranges 头
+        void write_ranges_header(std::string&& header_str) {
+            res_.response_str() = std::move(header_str);
+            req_.set_state(data_proc_state::data_continue); //设置data_continue 会读取req的
+            //设置下一个任务
+            continue_work_ = &connection::continue_write_then_route; //
         }
 
         //写数据 chunk_data
         void write_chunked_data(std::string&& buf, bool eof) {
-            //std::vector<boost::asio::const_buffer> buffers = res_.to_chunked_buffers(buf.data(), buf.length(), eof);
-            //if (buf.empty()) { //关闭
-                //handle_write(int{}); // TODO ?
-                //return;
-            //}
             res_.response_str() = res_.to_chunked_buffers(buf.data(),buf.length() , eof);
             if (eof) {
                 req_.set_state(data_proc_state::data_end); //data_end 应该如何做呢
@@ -205,36 +195,17 @@ namespace rojcpp {
             else {
                 req_.set_state(data_proc_state::data_continue);
             }
-            //call_back(); //路由
         }
 
         // TODO 什么是 ranges_data 文件的一个区间
         void write_ranges_data(std::string&& buf, bool eof) {
-            chunked_header_ = std::move(buf); //reuse the variable
-            auto self = this->shared_from_this();
-            // TODO async_write
-            //boost::asio::async_write(socket(), boost::asio::buffer(chunked_header_), [this, self, eof](const int& ec, size_t) {
-                //if (ec) {
-                    //return;
-                //}
-
-                //if (eof) {
-                    //req_.set_state(data_proc_state::data_end);
-                //}
-                //else {
-                    //req_.set_state(data_proc_state::data_continue);
-                //}
-
-                //call_back();
-            //});
-            async_write(chunked_header_);
+            res_.response_str() = std::move(buf);
             if (eof) {
                 req_.set_state(data_proc_state::data_end);
             }
             else {
                 req_.set_state(data_proc_state::data_continue);
             }
-            call_back();
         }
 
         void response_now() {
@@ -979,8 +950,9 @@ namespace rojcpp {
 
             call_back(); // 调用 http_router_ 其时就是route
 
-            if (req_.get_content_type() == content_type::chunked) //这里
-                return TO_EPOLL_WRITE;
+            //默认就是 写
+            //if (req_.get_content_type() == content_type::chunked) //这里
+                //return TO_EPOLL_WRITE;
 
             if (req_.get_state() == data_proc_state::data_error) {
                 return TO_EPOLL_WRITE;
@@ -1174,6 +1146,11 @@ namespace rojcpp {
             }
         }
 
+        /**
+         * TODO
+         * 重复执行的route会有性能损失
+         * 最好的方法是记录 直接要执行的route,不用筛选
+         */
         bool continue_write_then_route(){
             call_back();// 去route
             return TO_EPOLL_WRITE;
@@ -1368,6 +1345,7 @@ public:
 
         //如果想要断续写， saveErrno = EAGAIN ret < 0 to_wirte_byte !=0
         virtual ssize_t write(int* saveErrno) override{
+            LOG_DEBUG("write data %s \n",res_.response_str().c_str());
             Writen(res_.response_str().c_str(), res_.response_str().size()); //每一次写在rep_str_里
             last_transfer_ = 0 ;
             return res_.response_str().size();
