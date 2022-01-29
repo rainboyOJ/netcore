@@ -1345,7 +1345,7 @@ public:
 
         //如果想要断续写， saveErrno = EAGAIN ret < 0 to_wirte_byte !=0
         virtual ssize_t write(int* saveErrno) override{
-            LOG_DEBUG("write data %s \n",res_.response_str().c_str());
+            //LOG_DEBUG("write data %s \n",res_.response_str().c_str());
             Writen(res_.response_str().c_str(), res_.response_str().size()); //每一次写在rep_str_里
             last_transfer_ = 0 ;
             return res_.response_str().size();

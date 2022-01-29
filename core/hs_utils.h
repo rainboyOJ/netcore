@@ -2,9 +2,11 @@
  * 常用的http_sever 使用的工具类函数
  */
 #pragma once
+#include <filesystem>
 #include "connection.hpp"
 
 namespace rojcpp {
+
 /**
  * @brief 得到长度为len的数据
  */
@@ -27,7 +29,7 @@ void write_ranges_header(request& req, std::string_view mime, std::string filena
 
 void write_ranges_data(request& req);
 
-void process_download(request& req,response& rep);
+void process_download(std::string& file_path,request& req,response& rep);
 
 
 } // end namespace rojcpp
