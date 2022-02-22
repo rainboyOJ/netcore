@@ -141,8 +141,12 @@ namespace rojcpp {
         }
 
         //============ web socket ============
+        //template<typename... Fs>
+        //void send_ws_string(std::string msg, Fs&&... fs) {
+            //send_ws_msg(std::move(msg), opcode::text, std::forward<Fs>(fs)...);
+        //}
         template<typename... Fs>
-        void send_ws_string(std::string msg, Fs&&... fs) {
+        void send_ws_string(std::string&& msg, Fs&&... fs) {
             send_ws_msg(std::move(msg), opcode::text, std::forward<Fs>(fs)...);
         }
 
@@ -154,12 +158,12 @@ namespace rojcpp {
         template<typename... Fs>
         void send_ws_msg(std::string msg, opcode op = opcode::text, Fs&&... fs) {
             constexpr const size_t size = sizeof...(Fs);
-            static_assert(size != 0 || size != 2);
+            static_assert(size == 0 || size == 2); //必须这两个之一
             if constexpr(size == 2) {
                 set_callback(std::forward<Fs>(fs)...);
             }
 
-            auto header = ws_.format_header(msg.length(), op);
+            auto header = websocket::format_header(msg.length(), op);
             send_msg(std::move(header), std::move(msg));
         }
         //============ web socket ============

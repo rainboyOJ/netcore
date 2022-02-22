@@ -178,14 +178,16 @@ namespace rojcpp {
             return ws_frame_type::WS_BINARY_FRAME;
         }
 
-        std::string format_header(size_t length, opcode code) {
-            size_t header_length = encode_header(length, code);
+        static std::string format_header(size_t length, opcode code) {
+            char msg_header_[10];
+            size_t header_length = encode_header(length, code,msg_header_);
             return { msg_header_, header_length };
         }
 
-        std::vector<boost::asio::const_buffer> format_message(const char *src, size_t length, opcode code) {
-            size_t header_length = encode_header(length, code);
-            return{ boost::asio::buffer(msg_header_, header_length), boost::asio::buffer(src, length) };
+        static std::string format_message(const char *src, size_t length, opcode code) {
+            char msg_header_[10];
+            size_t header_length = encode_header(length, code,msg_header_);
+            return std::string(msg_header_, header_length) + std::string(src, length) ;
         }
 
         close_frame parse_close_payload(char *src, size_t length)
@@ -204,7 +206,7 @@ namespace rojcpp {
             return cf;
         }
 
-        std::string format_close_payload(uint16_t code, char *message, size_t length) {
+        static std::string format_close_payload(uint16_t code, char *message, size_t length) {
             std::string close_payload;
             if (code) {
                 close_payload.resize(length + 2);
@@ -227,7 +229,7 @@ namespace rojcpp {
             return (opcode)msg_opcode_;
         }
     private:
-        size_t encode_header(size_t length, opcode code) {
+        static size_t encode_header(size_t length, opcode code,char msg_header_[10]) {
             size_t header_length;
 
             if (length < 126) {
@@ -272,7 +274,6 @@ namespace rojcpp {
         unsigned char msg_opcode_   = 0;
         unsigned char msg_fin_      = 0;
 
-        char msg_header_[10];
     };
     
 }

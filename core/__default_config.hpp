@@ -44,6 +44,9 @@ struct __config__{
 
     //下载类型
     static constexpr transfer_type transfer_type_ = transfer_type::ACCEPT_RANGES;
+
+    //websocket
+    static constexpr std::size_t ws_thpool_size = 4; // ws_manager 里的线程池大小,用来主动发送数据
 };
 
 

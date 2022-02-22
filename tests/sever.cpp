@@ -1,5 +1,6 @@
 #include <regex>
 #include "http_server.hpp"
+#include "websocket_manager.h"
 
 using namespace rojcpp;
 struct check_login {
@@ -86,7 +87,8 @@ int main(){
             auto part_data = req.get_part_data();
             //echo
             std::string str = std::string(part_data.data(), part_data.length());
-            req.get_conn()->send_ws_string(std::move(str));
+            //req.get_conn()->send_ws_string(std::move(str));
+            WS_manager::get_instance().send_ws_string(req.get_conn()->GetFd(),std::move(str));
             std::cout << part_data.data() << std::endl;
         });
 
