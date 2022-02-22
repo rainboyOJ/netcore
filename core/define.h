@@ -9,6 +9,13 @@
 
 namespace fs = std::filesystem;
 namespace rojcpp {
+
+    enum parse_status {
+        complete = 0,
+        has_error = -1,
+        not_complete = -2,
+    };
+
     enum class content_type {
         string, // TODO add json
         multipart,

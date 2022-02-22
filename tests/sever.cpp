@@ -73,6 +73,28 @@ int main(){
                 res.set_status_and_content(status_type::ok,"yes,upload success!",req_content_type::string);
             });
 
+    //websocket 测试
+    Server.set_http_handler<GET, POST>("/ws", [](request& req, response& res) {
+        assert(req.get_content_type() == content_type::websocket);
+
+        req.on(ws_open, [](request& req){
+            std::cout << "websocket start" << std::endl;
+        });
+
+        req.on(ws_message, [](request& req) {
+            std::cout << "ws_message :test" << std::endl;
+            auto part_data = req.get_part_data();
+            //echo
+            std::string str = std::string(part_data.data(), part_data.length());
+            req.get_conn()->send_ws_string(std::move(str));
+            std::cout << part_data.data() << std::endl;
+        });
+
+        //req.on(ws_error, [](request& req) {
+            //std::cout << "websocket pack error or network error" << std::endl;
+        //});
+    });
+
 
 
 

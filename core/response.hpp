@@ -118,9 +118,9 @@ namespace rojcpp {
         }
 
         //转成buffers TODO 这个函数要改
-        std::vector<boost::asio::const_buffer> to_buffers() {
-            std::vector<boost::asio::const_buffer> buffers;
-            add_header("Host", "cinatra");
+        std::vector<std::string> to_buffers() {
+            std::vector<std::string> buffers;
+            add_header("Host", "rojcpp");
 
             if(session_ != nullptr && session_->is_need_update())
             {
@@ -138,19 +138,20 @@ namespace rojcpp {
                 buffers.emplace_back(boost::asio::buffer(crlf));
             }
 
-            buffers.push_back(boost::asio::buffer(crlf));
+            buffers.push_back(std::string(crlf));
 
             if (body_type_ == content_type::string) {
                 buffers.emplace_back(boost::asio::buffer(content_.data(), content_.size()));
             }
 
-            if (http_cache::get().need_cache(raw_url_)) {
-                cache_data.clear();
-                for (auto& buf : buffers) {
-                    //cache_data.push_back(std::string(boost::asio::buffer_cast<const char*>(buf),boost::asio::buffer_size(buf)));
-                    cache_data.push_back(buf);
-                }
-            }
+            // TODO cache
+            //if (http_cache::get().need_cache(raw_url_)) {
+                //cache_data.clear();
+                //for (auto& buf : buffers) {
+                    ////cache_data.push_back(std::string(boost::asio::buffer_cast<const char*>(buf),boost::asio::buffer_size(buf)));
+                    //cache_data.push_back(buf);
+                //}
+            //}
 
             return buffers;
         }

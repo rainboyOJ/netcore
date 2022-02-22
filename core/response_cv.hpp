@@ -163,7 +163,7 @@ namespace rojcpp {
     inline constexpr std::string_view rep_crcf = "\r\n";
     inline constexpr std::string_view rep_server = "Server: rojcpp\r\n";
 
-    inline const char name_value_separator[] = { ':', ' ' };
+    inline const char name_value_separator[] = { ':', ' ','\0' };
     //inline std::string_view crlf = "\r\n";
 
     inline const char crlf[] = { '\r', '\n' ,'\0'};
@@ -215,7 +215,7 @@ namespace rojcpp {
     template<unsigned num>
     struct num_to_string : detail::explode<num / 10, num % 10> {};
 
-    inline boost::asio::const_buffer to_buffer(status_type status) {
+    inline std::string to_buffer(status_type status) {
         switch (status) {
         case status_type::switching_protocols:
             return boost::asio::buffer(switching_protocols.data(), switching_protocols.length());

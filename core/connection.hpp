@@ -14,7 +14,7 @@
 
 #include "request.hpp" //请求
 #include "response.hpp" //响应
-//#include "websocket.hpp" //websocket
+#include "websocket.hpp" //websocket
 #include "define.h"
 #include "http_cache.hpp"
 #include "multipart_reader.hpp"
@@ -141,27 +141,27 @@ namespace rojcpp {
         }
 
         //============ web socket ============
-        //template<typename... Fs>
-        //void send_ws_string(std::string msg, Fs&&... fs) {
-            //send_ws_msg(std::move(msg), opcode::text, std::forward<Fs>(fs)...);
-        //}
+        template<typename... Fs>
+        void send_ws_string(std::string msg, Fs&&... fs) {
+            send_ws_msg(std::move(msg), opcode::text, std::forward<Fs>(fs)...);
+        }
 
-        //template<typename... Fs>
-        //void send_ws_binary(std::string msg, Fs&&... fs) {
-            //send_ws_msg(std::move(msg), opcode::binary, std::forward<Fs>(fs)...);
-        //}
+        template<typename... Fs>
+        void send_ws_binary(std::string msg, Fs&&... fs) {
+            send_ws_msg(std::move(msg), opcode::binary, std::forward<Fs>(fs)...);
+        }
 
-        //template<typename... Fs>
-        //void send_ws_msg(std::string msg, opcode op = opcode::text, Fs&&... fs) {
-            //constexpr const size_t size = sizeof...(Fs);
-            //static_assert(size != 0 || size != 2);
-            //if constexpr(size == 2) {
-                //set_callback(std::forward<Fs>(fs)...);
-            //}
+        template<typename... Fs>
+        void send_ws_msg(std::string msg, opcode op = opcode::text, Fs&&... fs) {
+            constexpr const size_t size = sizeof...(Fs);
+            static_assert(size != 0 || size != 2);
+            if constexpr(size == 2) {
+                set_callback(std::forward<Fs>(fs)...);
+            }
 
-            //auto header = ws_.format_header(msg.length(), op);
-            //send_msg(std::move(header), std::move(msg));
-        //}
+            auto header = ws_.format_header(msg.length(), op);
+            send_msg(std::move(header), std::move(msg));
+        }
         //============ web socket ============
 
         void write_chunked_header(std::string_view mime,bool is_range=false) {
@@ -937,9 +937,9 @@ namespace rojcpp {
             if (is_upgrade_) { //websocket
                 req_.set_http_type(content_type::websocket);
                 //timer_.cancel();
-                //ws_.upgrade_to_websocket(req_, res_);
+                ws_.upgrade_to_websocket(req_, res_);
                 response_handshake();
-                return TO_EPOLL_WRITE;
+                return TO_EPOLL_READ;
             }
 
             bool r = handle_gzip();
@@ -965,176 +965,14 @@ namespace rojcpp {
         }
 
         //-------------web socket----------------//
-        void response_handshake() {
-            std::vector<boost::asio::const_buffer> buffers = res_.to_buffers();
-            if (buffers.empty()) {
-                Close();
-                return;
-            }
+        void response_handshake();
+        bool handle_ws_data(); //处理ws数据
+        bool do_read_websocket_head();
 
-            auto self = this->shared_from_this();
-            // TODO
-            //boost::asio::async_write(socket(), buffers, [this, self](const int& ec, std::size_t length) {
-                //if (ec) {
-                    //close();
-                    //return;
-                //}
-
-                //req_.set_state(data_proc_state::data_begin);
-                //call_back();
-                //req_.call_event(req_.get_state());
-
-                //req_.set_current_size(0);
-                //do_read_websocket_head(SHORT_HEADER);
-            //});
-        }
-
-        //web socket
-        /*
-        void do_read_websocket_head(size_t length) {
-            auto self = this->shared_from_this();
-            boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), length),
-                [this, self](const int& ec, size_t bytes_transferred) {
-                if (ec) {
-                    cancel_timer();
-                    req_.call_event(data_proc_state::data_error);
-
-                    close();
-                    return;
-                }
-
-                size_t length = bytes_transferred + req_.current_size();
-                req_.set_current_size(0);
-                int ret = ws_.parse_header(req_.buffer(), length);
-
-                if (ret == parse_status::complete) {
-                    //read payload
-                    auto payload_length = ws_.payload_length();
-                    req_.set_body_len(payload_length);
-                    if (req_.at_capacity(payload_length)) {
-                        req_.call_event(data_proc_state::data_error);
-                        close();
-                        return;
-                    }
-
-                    req_.set_current_size(0);
-                    req_.fit_size();
-                    do_read_websocket_data(req_.left_body_len());
-                }
-                else if (ret == parse_status::not_complete) {
-                    req_.set_current_size(bytes_transferred);
-                    do_read_websocket_head(ws_.left_header_len());
-                }
-                else {
-                    req_.call_event(data_proc_state::data_error);
-                    close();
-                }
-            });
-        }
-
-        void do_read_websocket_data(size_t length) {
-            auto self = this->shared_from_this();
-            boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), length),
-                [this, self](const int& ec, size_t bytes_transferred) {
-                if (ec) {
-                    req_.call_event(data_proc_state::data_error);
-                    close();
-                    return;
-                }
-
-                if (req_.body_finished()) {
-                    req_.set_current_size(0);
-                    bytes_transferred = ws_.payload_length();
-                }
-
-                std::string payload;
-                ws_frame_type ret = ws_.parse_payload(req_.buffer(), bytes_transferred, payload);
-                if (ret == ws_frame_type::WS_INCOMPLETE_FRAME) {
-                    req_.update_size(bytes_transferred);
-                    req_.reduce_left_body_size(bytes_transferred);
-                    do_read_websocket_data(req_.left_body_len());
-                    return;
-                }
-
-                if (ret == ws_frame_type::WS_INCOMPLETE_TEXT_FRAME || ret == ws_frame_type::WS_INCOMPLETE_BINARY_FRAME) {
-                    last_ws_str_.append(std::move(payload));
-                }
-
-                if (!handle_ws_frame(ret, std::move(payload), bytes_transferred))
-                    return;
-
-                req_.set_current_size(0);
-                do_read_websocket_head(SHORT_HEADER);
-            });
-        }
-        */
-
-        // web socket
-        /*
-        bool handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred) {
-            switch (ret)
-            {
-            case rojcpp::ws_frame_type::WS_ERROR_FRAME:
-                req_.call_event(data_proc_state::data_error);
-                close();
-                return false;
-            case rojcpp::ws_frame_type::WS_OPENING_FRAME:
-                break;
-            case rojcpp::ws_frame_type::WS_TEXT_FRAME:
-            case rojcpp::ws_frame_type::WS_BINARY_FRAME:
-            {
-                reset_timer();
-                std::string temp;
-                if (!last_ws_str_.empty()) {
-                    temp = std::move(last_ws_str_);                    
-                }
-                temp.append(std::move(payload));
-                req_.set_part_data(temp);
-                req_.call_event(data_proc_state::data_continue);
-            }
-            //on message
-            break;
-            case rojcpp::ws_frame_type::WS_CLOSE_FRAME:
-            {
-                close_frame close_frame = ws_.parse_close_payload(payload.data(), payload.length());
-                const int MAX_CLOSE_PAYLOAD = 123;
-                size_t len = std::min<size_t>(MAX_CLOSE_PAYLOAD, payload.length());
-                req_.set_part_data({ close_frame.message, len });
-                req_.call_event(data_proc_state::data_close);
-
-                std::string close_msg = ws_.format_close_payload(opcode::close, close_frame.message, len);
-                auto header = ws_.format_header(close_msg.length(), opcode::close);
-                send_msg(std::move(header), std::move(close_msg));
-            }
-            break;
-            case rojcpp::ws_frame_type::WS_PING_FRAME:
-            {
-                auto header = ws_.format_header(payload.length(), opcode::pong);
-                send_msg(std::move(header), std::move(payload));
-            }
-            break;
-            case rojcpp::ws_frame_type::WS_PONG_FRAME:
-                ws_ping();
-                break;
-            default:
-                break;
-            }
-
-            return true;
-        }
-
-        void ws_ping() {
-            timer_.expires_from_now(std::chrono::seconds(60));
-            timer_.async_wait([self = this->shared_from_this()](int const& ec) {
-                if (ec) {
-                    self->close(false);
-                    return;
-                }
-
-                self->send_ws_msg("ping", opcode::ping);
-            });
-        }
-        */
+        bool ws_response_handshake_continue_work();
+        bool do_read_websocket_data(); 
+        bool handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred);
+        void ws_ping() ;
         //-------------web socket----------------//
 
         //-------------chunked(read chunked not support yet, write chunked is ok)----------------------//
@@ -1213,14 +1051,8 @@ namespace rojcpp {
             //do_write(); //response to client
         }
 
-        enum parse_status {
-            complete = 0,
-            has_error = -1,
-            not_complete = -2,
-        };
 
         void check_keep_alive() {
-            return; // TODO keep_alive_
             auto req_conn_hdr = req_.get_header_value("connection");
             if (req_.is_http11()) {
                 keep_alive_ = req_conn_hdr.empty() || !iequal(req_conn_hdr.data(), req_conn_hdr.size(), "close");
@@ -1229,12 +1061,14 @@ namespace rojcpp {
                 keep_alive_ = !req_conn_hdr.empty() && iequal(req_conn_hdr.data(), req_conn_hdr.size(), "keep-alive");
             }
 
-            LOG_INFO("req_conn_hdr ",req_conn_hdr.data());
+            LOG_DEBUG(" req_conn_hdr ",req_conn_hdr.data());
+            LOG_DEBUG("check_keep_alive : %d ",keep_alive_);
+
             res_.set_keep_alive(keep_alive_);
 
             if (keep_alive_) {
                 // TODO
-                //is_upgrade_ = ws_.is_upgrade(req_);
+                is_upgrade_ = ws_.is_upgrade(req_);
             }
         }
 
@@ -1263,22 +1097,21 @@ namespace rojcpp {
         void do_write_msg() {
             active_buffer_ ^= 1; // switch buffers
             for (const auto& data : buffers_[active_buffer_]) {
-                //for (const auto& e : data) { // TODO ???
-                    //buffer_seq_.push_back(e);
-                //}
-                async_write(data);
+                direct_write(data.c_str(),data.length()); // 写
             }
+            buffers_[active_buffer_].clear(); //清空
+            buffer_seq_.clear();    //清空
 
             //boost::asio::async_write(socket(), buffer_seq_, [this, self = this->shared_from_this()](const int& ec, size_t bytes_transferred) {
-                std::lock_guard<std::mutex> lock(buffers_mtx_);
-                buffers_[active_buffer_].clear();
-                buffer_seq_.clear();
+                //std::lock_guard<std::mutex> lock(buffers_mtx_); //两次获取
+                //buffers_[active_buffer_].clear(); //清空
+                //buffer_seq_.clear();    //清空
 
                 //if (!ec) {
-                    if (send_ok_cb_)
-                        send_ok_cb_();
-                    if (!buffers_[active_buffer_ ^ 1].empty()) // have more work
-                        do_write_msg();
+                    //if (send_ok_cb_)
+                        //send_ok_cb_();
+                    //if (!buffers_[active_buffer_ ^ 1].empty()) // have more work
+                        //do_write_msg();
                 //}
                 //else {
                     //if (send_failed_cb_)
@@ -1293,7 +1126,7 @@ namespace rojcpp {
         bool noasync_write(const char * buff_){ //写一些东西
         }
 
-        bool writing() const { return !buffer_seq_.empty(); }
+        bool writing() const { return !buffer_seq_.empty(); } // buffer_seq_ 不空的时候是在写
 
         template<typename F1, typename F2>
         void set_callback(F1&& f1, F2&& f2) {
@@ -1332,7 +1165,7 @@ public:
             has_shake_ = false;
             continue_work_ = nullptr;
             userCount--;
-            close(fd_);
+            ::close(fd_);
             LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
@@ -1382,6 +1215,14 @@ public:
 
         void clear_continue_workd(){
             continue_work_ = nullptr;
+        }
+
+        // 直接写数据,而不是写res 里的内容
+        ssize_t direct_write(const char * data ,std::size_t len /*, int* saveErrno */) {
+            //LOG_DEBUG("write data %s \n",res_.response_str().c_str());
+            Writen(data,len); //每一次写在rep_str_里
+            //last_transfer_ = 0 ;
+            return len;
         }
 
 private:
@@ -1450,7 +1291,7 @@ private:
         bool enable_timeout_ = true;
         response res_; //响应
         request  req_; //请求
-        //websocket ws_;
+        websocket ws_;
         bool is_upgrade_ = false;
         bool keep_alive_ = false;
         const std::size_t MAX_REQ_SIZE_{3*1024*1024}; //请求的最大大小,包括上传文件
