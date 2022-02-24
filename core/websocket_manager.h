@@ -8,6 +8,8 @@
 #include <mutex>
 #include <unordered_map>
 
+#include<sys/socket.h>
+
 #include "define.h"
 #include "../lib/threadpool.hpp" // 线程池
 #include "websocket.hpp"
@@ -45,25 +47,33 @@ public:
         //hsp->get_conn()->send_ws_string(std::move(msg));
     }
 
-    template<typename... Fs>
-    void send_ws_string(int fd,std::string msg, Fs&&... fs) {
-        send_ws_msg(fd,std::move(msg), opcode::text, std::forward<Fs>(fs)...);
+    //template<typename... Fs>
+    void send_ws_string(int fd,std::string msg,bool close = false) {
+        //send_ws_msg(fd,std::move(msg), opcode::text, std::forward<Fs>(fs)...);
+        send_ws_msg(fd,std::move(msg), opcode::text,close);
+    }
+
+    //关闭,发送关闭的信息
+    static void Close(int fd){
+        shutdown(fd, SHUT_RDWR); //发送关闭的信息
     }
 
 private:
-    template<typename... Fs>
-    void send_ws_msg(int fd,std::string msg, opcode op = opcode::text, Fs&&... fs) {
-        constexpr const size_t size = sizeof...(Fs);
-        static_assert(size != 0 || size != 2);
+    //template<typename... Fs>
+    void send_ws_msg(int fd,std::string msg, opcode op = opcode::text ,bool close = false) {
+        //constexpr const size_t size = sizeof...(Fs);
+        //static_assert(size == 0 || size == 2);
         //if constexpr(size == 2) {
-            //set_callback(std::forward<Fs>(fs)...);
+            //set_callback(std::forward<Fs>(fs)...); // 执行call back
         //}
         auto header = websocket::format_header(msg.length(), op);
         //send_msg(std::move(header), std::move(msg));
         //std::string send_msg = header + msg;
-        thpool.commit([send_msg = header + msg,fd,this](){
+        thpool.commit([send_msg = header + msg,close,fd,this](){
             std::lock_guard<std::mutex> lock(fd_mutex[fd % 4]);
             Writen(fd, send_msg.c_str() , send_msg.length());
+            if( close )
+                Close(fd);
         });
     }
 

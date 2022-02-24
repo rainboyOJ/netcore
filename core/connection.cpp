@@ -14,7 +14,7 @@ void connection::response_handshake() {
     }
     // 直接写
     for (auto& e : buffers) {
-        LOG_DEBUG("%s,%d",e.c_str(),e.length());
+        //LOG_DEBUG("%s,%d",e.c_str(),e.length());
         buf_to_send.append(std::move(e));
     }
     LOG_DEBUG("%s",buf_to_send.c_str());
@@ -141,7 +141,7 @@ bool connection::do_read_websocket_data() {
     ws_frame_type ret = ws_.parse_payload(req_.buffer(), bytes_transferred, payload); //解析payload
     if (ret == ws_frame_type::WS_INCOMPLETE_FRAME) { // 末完成的frame
         req_.update_size(bytes_transferred);
-        req_.reduce_left_body_size(bytes_transferred);
+        req_.reduce_left_body_size(bytes_transferred);;
         continue_work_ = &connection::do_read_websocket_data;
         return TO_EPOLL_READ; //继续去读
     }
@@ -186,6 +186,7 @@ bool connection::handle_ws_frame(ws_frame_type ret, std::string&& payload, size_
             break;
         case rojcpp::ws_frame_type::WS_CLOSE_FRAME:
             {
+                LOG_DEBUG("handle_ws_frame type : ws_frame_type::WS_CLOSE_FRAME");
                 close_frame close_frame = ws_.parse_close_payload(payload.data(), payload.length());
                 const int MAX_CLOSE_PAYLOAD = 123;
                 size_t len = std::min<size_t>(MAX_CLOSE_PAYLOAD, payload.length());
@@ -194,7 +195,9 @@ bool connection::handle_ws_frame(ws_frame_type ret, std::string&& payload, size_
 
                 std::string close_msg = ws_.format_close_payload(opcode::close, close_frame.message, len);
                 auto header = ws_.format_header(close_msg.length(), opcode::close);
-                send_msg(std::move(header), std::move(close_msg)); //发送
+                WS_manager::get_instance().send_ws_string(GetFd(), header+close_msg,true);
+                return false;
+                //send_msg(std::move(header), std::move(close_msg),true); //发送
             }
             break;
         case rojcpp::ws_frame_type::WS_PING_FRAME:

@@ -34,9 +34,9 @@ using std::forward;
 //不直接支持类成员函数, 支持类静态成员函数或全局函数,operator(),lambda函数等
 class threadpool {
     using TaskType = function<void()>; //任务的类型
-    vector<thread>     _pool;       //线程池
+    vector<thread>     _pool;      //线程池
     queue<TaskType>    _tasks;     //任务队列
-    condition_variable _task_cv;//条件阻塞
+    condition_variable _task_cv;   //条件阻塞
     mutex              _lock;
     atomic<bool>       _run{true};    //线程池是否执行
     atomic<int>        _idlThrNum{0}; //空闲线程数量

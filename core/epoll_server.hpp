@@ -293,6 +293,10 @@ void epoll_server<HttpConn>::OnRead_(HttpConn* client) {
 template<typename HttpConn>
 void epoll_server<HttpConn>::OnProcess(HttpConn* client) {
     if(client->process()) { 
+        if( client->is_ws_socket() ){ // websocket 如果进入写的状态就是等关闭
+            epoller_->ModFd(client->GetFd(), connEvent_); //不会进入读取也不会进入写 ,等待WS_manager 的关闭
+            return ;
+        }
         // client->process返回true的时候表示已经读取完毕想要的数据
         // 转入 写的阶段,否则继续读取
         LOG_DEBUG("After client->process() set server continue to write.");

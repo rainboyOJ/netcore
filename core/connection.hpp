@@ -19,6 +19,7 @@
 #include "http_cache.hpp"
 #include "multipart_reader.hpp"
 #include "buffer.h"
+#include "websocket_manager.h"
 
 #define TO_EPOLL_WRITE  true
 #define TO_EPOLL_READ  false
@@ -145,6 +146,9 @@ namespace rojcpp {
         //void send_ws_string(std::string msg, Fs&&... fs) {
             //send_ws_msg(std::move(msg), opcode::text, std::forward<Fs>(fs)...);
         //}
+        bool is_ws_socket() const {
+            return is_upgrade_;
+        }
         template<typename... Fs>
         void send_ws_string(std::string&& msg, Fs&&... fs) {
             send_ws_msg(std::move(msg), opcode::text, std::forward<Fs>(fs)...);
@@ -1091,11 +1095,12 @@ namespace rojcpp {
         }
 
         void send_msg(std::string&& header, std::string&& data) {
-            std::lock_guard<std::mutex> lock(buffers_mtx_);
-            buffers_[active_buffer_ ^ 1].push_back(std::move(header));
-            buffers_[active_buffer_ ^ 1].push_back(std::move(data)); // move input data to the inactive buffer
-            if (!writing())
-                do_write_msg();
+            WS_manager::get_instance().send_ws_string(GetFd(),header+data);
+            //std::lock_guard<std::mutex> lock(buffers_mtx_);
+            //buffers_[active_buffer_ ^ 1].push_back(std::move(header));
+            //buffers_[active_buffer_ ^ 1].push_back(std::move(data)); // move input data to the inactive buffer
+            //if (!writing())
+                //do_write_msg();
         }
 
         void do_write_msg() {
