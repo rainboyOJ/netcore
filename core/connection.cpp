@@ -20,7 +20,15 @@ void connection::response_handshake() {
     LOG_DEBUG("%s",buf_to_send.c_str());
     direct_write(buf_to_send.c_str(), buf_to_send.length());
     //set_continue_workd
-    continue_work_ = &connection::ws_response_handshake_continue_work;
+    //continue_work_ = &connection::ws_response_handshake_continue_work;
+
+    req_.set_state(data_proc_state::data_begin); // alias ws_open
+    call_back();
+    req_.call_event(req_.get_state());
+    req_.set_current_size(0); //清空
+    //do_read_websocket_head(SHORT_HEADER);
+    continue_work_ = &connection::handle_ws_data;
+    //return TO_EPOLL_READ; //转入读取
 }
 
 bool connection::ws_response_handshake_continue_work(){
