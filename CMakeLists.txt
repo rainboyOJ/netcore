@@ -51,5 +51,8 @@ aux_source_directory(core/hs_utils HTTPSERVER_UTILS_SRC)
 #add_executable(test ${DIR_SRCS})
 add_library(netcore STATIC ${DIR_SRCS} ${CORE_SRC} ${HTTPSERVER_UTILS_SRC})
 
+if( NOT DEFINED NOT_ADD_NETCORE_TESTS )
+    add_subdirectory(tests)
+endif(NOT DEFINED NOT_ADD_NETCORE_TESTS )
 
-add_subdirectory(tests)
+
