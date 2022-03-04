@@ -211,7 +211,8 @@ bool connection::handle_ws_frame(ws_frame_type ret, std::string&& payload, size_
         case rojcpp::ws_frame_type::WS_PING_FRAME:
             {
                 auto header = ws_.format_header(payload.length(), opcode::pong);
-                send_msg(std::move(header), std::move(payload));
+                //send_msg(std::move(header), std::move(payload));
+                WS_manager::get_instance().send_ws_string(GetFd(), header+payload);
             }
             break;
         case rojcpp::ws_frame_type::WS_PONG_FRAME:
