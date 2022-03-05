@@ -1215,7 +1215,7 @@ public:
 
         virtual bool IsKeepAlive() const override{
             //LOG_INFO("keep_alive_ %d\n",keep_alive_);
-            return keep_alive_;
+            return keep_alive_ && is_upgrade_;
         }
 
         bool has_continue_workd(){
