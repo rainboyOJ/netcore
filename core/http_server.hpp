@@ -10,8 +10,6 @@
 #include "utils.hpp" 
 #include "connection.hpp"
 #include "http_router.hpp"
-////#include "router.hpp" #include "function_traits.hpp"
-//#include "url_encode_decode.hpp"
 #include "http_cache.hpp"
 #include "timer.hpp" //定时器
 #include "hs_utils.h"
@@ -41,11 +39,11 @@ namespace rojcpp {
                 ,__config__::trigMode //int trigMode, 2表示监听的时候是 LET 模式
                 ,__config__::timeoutMS//10*1000 //int timeoutMS 超时就会断开连接
                 ,__config__::OptLinger //true //bool OptLinger, 优雅关闭: 直到所剩数据发送完毕或超时 ,__config__:://3306 //int sqlPort,
-                ,__config__::sqlPort// sql的端口
-                ,__config__::sqlUser//"root" //const char *sqlUser,
-                ,__config__::sqlPwd//"root" //const char *sqlPwd,
-                ,__config__::dbName//"rojcpp" //const char *dbName,
-                ,__config__::connPoolNum//4//int connPoolNum,
+                //,__config__::sqlPort// sql的端口
+                //,__config__::sqlUser//"root" //const char *sqlUser,
+                //,__config__::sqlPwd//"root" //const char *sqlPwd,
+                //,__config__::dbName//"rojcpp" //const char *dbName,
+                //,__config__::connPoolNum//4//int connPoolNum,
                 ,__config__::threadNum//4//int threadNum,
                 ,__config__::openLog//true//bool openLog,
                 ,__config__::logLevel//0//int logLevel, //最低级别
@@ -55,12 +53,15 @@ namespace rojcpp {
 
         void init(
         int port, int trigMode, int timeoutMS, bool OptLinger, 
-        int sqlPort, const char* sqlUser, const  char* sqlPwd, 
-        const char* dbName, int connPoolNum, int threadNum,
+        //int sqlPort, const char* sqlUser, const  char* sqlPwd, 
+        //const char* dbName, int connPoolNum,
+        int threadNum,
         bool openLog, int logLevel, int logQueSize
                 )
         {
-            __init__(port, trigMode, timeoutMS, OptLinger, sqlPort, sqlUser, sqlPwd, dbName, connPoolNum, threadNum, openLog, logLevel, logQueSize);
+            epoll_server<connection>::__init__(port, trigMode, timeoutMS, OptLinger,
+                    //sqlPort, sqlUser, sqlPwd, dbName, connPoolNum,
+                    threadNum, openLog, logLevel, logQueSize);
             http_cache::get().set_cache_max_age(86400); // 最大的cache时间
             init_conn_callback(); //初始化 连接的回掉函数 http_handler_ ,static_res_hander 静态资源hander
             //定时器

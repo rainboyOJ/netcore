@@ -13,7 +13,7 @@
 #include <memory>
 
 #include "threadpool.h"
-#include "sqlconnpool.h"
+//#include "sqlconnpool.h"
 #include "epoller.h"
 #include "heaptimer.h"
 
@@ -25,8 +25,9 @@ public:
     epoll_server()=default;
     void __init__(
         int port, int trigMode, int timeoutMS, bool OptLinger, 
-        int sqlPort, const char* sqlUser, const  char* sqlPwd, 
-        const char* dbName, int connPoolNum, int threadNum,
+        //int sqlPort, const char* sqlUser, const  char* sqlPwd, 
+        //const char* dbName, int connPoolNum, 
+        int threadNum,
         bool openLog, int logLevel, int logQueSize
             );
 
@@ -80,8 +81,9 @@ protected:
 template<typename HttpConn>
 void epoll_server<HttpConn>::__init__(
         int port, int trigMode, int timeoutMS, bool OptLinger, 
-        int sqlPort, const char* sqlUser, const  char* sqlPwd, 
-        const char* dbName, int connPoolNum, int threadNum,
+        //int sqlPort, const char* sqlUser, const  char* sqlPwd, 
+        //const char* dbName, int connPoolNum,
+        int threadNum,
         bool openLog, int logLevel, int logQueSize){
 
     port_       = port;
@@ -94,7 +96,7 @@ void epoll_server<HttpConn>::__init__(
     epoller_    = std::make_unique<Epoller>();
 
     //TODO HttpConn init
-    SqlConnPool::Instance()->Init("127.0.0.1", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
+    //SqlConnPool::Instance()->Init("127.0.0.1", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
 
     InitEventMode_(trigMode);
     if(!InitSocket_()) { isClose_ = true;}
@@ -113,7 +115,7 @@ void epoll_server<HttpConn>::__init__(
                             (connEvent_ & EPOLLET ? "ET": "LT"));
             LOG_INFO("LogSys level: %d", logLevel);
             //LOG_INFO("srcDir: %s", HttpConn::srcDir);
-            LOG_INFO("SqlConnPool num: %d, ThreadPool num: %d", connPoolNum, threadNum);
+            //LOG_INFO("SqlConnPool num: %d, ThreadPool num: %d", connPoolNum, threadNum);
         }
     }
 }
@@ -122,7 +124,7 @@ template<typename HttpConn>
 epoll_server<HttpConn>::~epoll_server(){
     close(listenFd_);
     isClose_ = true;
-    SqlConnPool::Instance()->ClosePool();
+    //SqlConnPool::Instance()->ClosePool();
 }
 
 template<typename HttpConn>
