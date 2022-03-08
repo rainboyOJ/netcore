@@ -17,7 +17,8 @@ namespace rojcpp {
     };
 
     enum class content_type {
-        string, // TODO add json
+        string,
+        json,
         multipart,
         urlencoded,
         chunked,

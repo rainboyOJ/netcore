@@ -335,6 +335,7 @@ namespace rojcpp {
                 req_.set_http_type(type);
                 switch (type) {
                 case rojcpp::content_type::string:
+                case rojcpp::content_type::json:
                 case rojcpp::content_type::unknown:
                     return handle_string_body(bytes_transferred);
                 case rojcpp::content_type::multipart:
@@ -553,6 +554,9 @@ namespace rojcpp {
                 }
                 else if (content_type.find("application/octet-stream") != std::string_view::npos) {
                     return content_type::octet_stream;
+                }
+                else if (content_type.find("application/json") != std::string_view::npos) {
+                    return content_type::json;
                 }
                 else {
                     return content_type::string;
