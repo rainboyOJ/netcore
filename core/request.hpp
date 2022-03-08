@@ -86,13 +86,14 @@ namespace rojcpp {
         }
 
         // Author:Rainboy
-        int parse_header_expand_last_len(std::size_t exp_last_len){
-            LOG_DEBUG("last_len_ %d",last_len_);
-            int ret  = parse_header(last_len_);
-            last_len_ += exp_last_len;
-            return ret;
-        }
+        //int parse_header_expand_last_len(std::size_t exp_last_len){
+            //LOG_DEBUG("last_len_ %d",last_len_);
+            //int ret  = parse_header(last_len_);
+            //last_len_ += exp_last_len;
+            //return ret;
+        //}
 
+        // last_len_ 应该从0开始
         // 解析 headers
         int parse_header(std::size_t last_len, size_t start=0) {
             using namespace std::string_view_literals;

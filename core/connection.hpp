@@ -267,7 +267,8 @@ namespace rojcpp {
             //auto last_len = req_.current_size();
             //last_transfer_ = last_len;
             //LOG_DEBUG("this pointer is %llx",static_cast<void *>(this));
-            int ret = req_.parse_header_expand_last_len(last_transfer_); //解析头
+            //int ret = req_.parse_header_expand_last_len(last_transfer_); //解析头
+            int ret = req_.parse_header(len_); //解析头
             LOG_INFO("handle_read, parse_size %d",ret);
             update_len_(last_transfer_); //已经处理的数据
             LOG_DEBUG("METHOD: %.*s",req_.get_method().length(),req_.get_method().data())
@@ -1328,7 +1329,7 @@ private:
         std::any tag_;
         std::function<void(request&, std::string&)> multipart_begin_ = nullptr;
 
-        size_t len_ = 0;
+        size_t len_ = 0; // 和pipline 有关,但我不知道什么是pipline
         size_t last_transfer_ = 0;  //最后转化了多少字节
         //bool isFirstRead{true};
         using continue_work = bool(connection::*)();
