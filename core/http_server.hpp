@@ -9,6 +9,7 @@
 #include "epoll_server.hpp" 
 #include "utils.hpp" 
 #include "connection.hpp"
+#include "ws_before_ap.h"
 #include "http_router.hpp"
 #include "http_cache.hpp"
 #include "timer.hpp" //定时器
@@ -79,6 +80,16 @@ namespace rojcpp {
             }
         }
 
+        /**
+         * @desc 注册 websocket 连接检查函数
+         */
+        void regist_ws_conn_check(
+                std::string_view url_name,
+                websocket_before_ap_mananger::AP_Type&& ap
+                ){
+            ws_before_ap.regist(url_name, std::move(ap));
+        }
+
         void set_static_res_handler();
 
         void init_conn_callback() {
@@ -109,6 +120,12 @@ namespace rojcpp {
             http_handler_ = [this](request& req, response& res) { //这里初始化了 http_handler_
                 res.set_headers(req.get_headers());
                 this->http_handler_check_(req,res,true); //真正开始执行
+            };
+
+
+            ws_connection_check_ = [this](request& req,response & res)->bool{
+                LOG_DEBUG("ws_connection_check_, url is %.*s",req.get_url().length(),req.get_url().data());
+                return  ws_before_ap.invoke(std::string(req.get_url()), req, res);
             };
         }
 
@@ -252,6 +269,7 @@ namespace rojcpp {
             std::size_t max_req_size, long keep_alive_timeout,
             http_handler* handler, 
             http_handler_check * handler_check,
+            ws_connection_check * ws_conn_check,
             std::string& static_dir,
             std::function<bool(request& req, response& res)>* upload_check
             ) {
@@ -268,6 +286,7 @@ namespace rojcpp {
             users_.emplace( fd, 
                     std::make_shared<connection>( max_req_size,keep_alive_timeout, 
                         handler,handler_check,
+                        ws_conn_check,
                         static_dir,upload_check)
                     );
             //users_[fd]->start(); // 设置conn_指向自己
@@ -303,10 +322,11 @@ namespace rojcpp {
                 return;
             }
             AddClient_(fd, addr,
-                    max_req_buf_size_, //max_req_size
-                    keep_alive_timeout_, //keep_alive_timeout
-                    &http_handler_, // http_handler& handler
-                    &http_handler_check_, //检查是否有对应的路由
+                    max_req_buf_size_,    // max_req_size
+                    keep_alive_timeout_,  // keep_alive_timeout
+                    &http_handler_,       // http_handler& handler
+                    &http_handler_check_, // 检查是否有对应的路由
+                    &ws_connection_check_,// 检查websocket的连接是否允许
                     upload_dir_, //std::string& static_dir
                     upload_check_? &upload_check_ : nullptr // upload_check
                     );
@@ -315,6 +335,9 @@ namespace rojcpp {
 
 //====================  epoll_server virtual end
 
+
+        //websocket 发起连接前的检查
+        websocket_before_ap_mananger ws_before_ap;
 
         std::size_t max_req_buf_size_ = 3 * 1024 * 1024; //max request buffer size 3M
         long keep_alive_timeout_ = 60; //max request timeout 60s
@@ -327,6 +350,8 @@ namespace rojcpp {
         bool enable_timeout_ = true;
         http_handler http_handler_ = nullptr; // 被加入到connection 里,主要作用是调用router
         http_handler_check http_handler_check_ = nullptr; //检查是否存在对应的路由
+        ws_connection_check ws_connection_check_ = nullptr; //检查websocket 是否可以连接
+
         std::function<bool(request& req, response& res)> download_check_ = nullptr;
         std::vector<std::string> relate_paths_;
         std::function<bool(request& req, response& res)> upload_check_ = nullptr;
@@ -334,6 +359,7 @@ namespace rojcpp {
         std::function<void(request& req, response& res)> not_found_ = nullptr;
         std::function<void(request&, std::string&)> multipart_begin_ = nullptr;
         //std::function<bool(std::shared_ptr<connection<SocketType>>)> on_conn_ = nullptr; //作什么用的?
+        
 
         size_t max_header_len_;
         check_header_cb check_headers_;

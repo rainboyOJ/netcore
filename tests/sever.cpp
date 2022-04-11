@@ -54,6 +54,18 @@ int main(){
                 res.set_status_and_content(status_type::ok,"yes,now logined",req_content_type::string);
             });
 
+    // string -> body  eacho
+    Server.set_http_handler<POST>("/string_body_echo",
+            [](request & req,response & res){
+            auto res_type = req.get_content_type() == content_type::json 
+                            ? req_content_type::json
+                            : req_content_type::string;
+                res.set_status_and_content(status_type::ok,
+                        std::string(req.body())
+                        ,res_type);
+            });
+
+
     Server.set_http_handler<POST>("/signout",
             [](request & req,response & res){
                 auto weak_session = req.get_session();
@@ -74,9 +86,17 @@ int main(){
                 res.set_status_and_content(status_type::ok,"yes,upload success!",req_content_type::string);
             });
 
+
+    Server.regist_ws_conn_check("/ws", [](request& req,response & res) -> bool{
+        if( req.get_url() == "/ws"sv) {
+            return true;
+        }
+        return false;
+    });
+
     //websocket 测试
     Server.set_http_handler<GET, POST>("/ws", [](request& req, response& res) {
-        assert(req.get_content_type() == content_type::websocket);
+        //assert(req.get_content_type() == content_type::websocket);
 
         req.on(ws_open, [](request& req){
             std::cout << "websocket start" << std::endl;

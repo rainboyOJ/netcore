@@ -295,9 +295,13 @@ void epoll_server<HttpConn>::OnRead_(HttpConn* client) {
 template<typename HttpConn>
 void epoll_server<HttpConn>::OnProcess(HttpConn* client) {
     if(client->process()) { 
+
+        //此时,ws要进入写的模式
         if( client->is_ws_socket() ){ // websocket 如果进入写的状态就是等关闭
             epoller_->ModFd(client->GetFd(), connEvent_); //不会进入读取也不会进入写 ,等待WS_manager 的关闭
             return ;
+            // FAQ 1. websocket 不进入读取,那如何读取数据呢?
+            // FAQ 2. WS_manager 关闭 fd是直接调用close(fd)吗?
         }
         // client->process返回true的时候表示已经读取完毕想要的数据
         // 转入 写的阶段,否则继续读取

@@ -4,6 +4,7 @@ namespace rojcpp {
         std::atomic<int> HttpConn::userCount = 0;
 
 //-------------web socket----------------//
+//@desc 返回握手信息,其实就是直接写数据
 void connection::response_handshake() {
     std::vector<std::string> buffers = res_.to_buffers();
     LOG_DEBUG("response_handshake : %d",buffers.empty());
@@ -27,7 +28,7 @@ void connection::response_handshake() {
     req_.call_event(req_.get_state());
     req_.set_current_size(0); //清空
     //do_read_websocket_head(SHORT_HEADER);
-    continue_work_ = &connection::handle_ws_data;
+    continue_work_ = &connection::handle_ws_data; //以后读取的数据会进入 handle_ws_data
     //return TO_EPOLL_READ; //转入读取
 }
 

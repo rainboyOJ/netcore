@@ -18,6 +18,9 @@
 ```cmake
 set(USER_CONFIG_PATH "${PROJECT_SOURCE_DIR}/__user_config.hpp")
 ```
+## 注意
+
+- 需要创建`config`里的上传与静态文件夹
 
 
 # 使用cpp编写的oj服务器

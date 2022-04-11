@@ -2,7 +2,6 @@
 #include "request.hpp"
 #include "ws_define.h"
 #include "sha1.hpp"
-#include "ws_define.h"
 #include "utils.hpp"
 
 /**

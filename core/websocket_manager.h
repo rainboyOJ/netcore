@@ -55,7 +55,9 @@ public:
 
     //关闭,发送关闭的信息
     static void Close(int fd){
+//[epoll触发事件的分析_halfclear的博客-CSDN博客_epoll可以监听哪些事件](https://blog.csdn.net/halfclear/article/details/78061771)
         shutdown(fd, SHUT_RDWR); //发送关闭的信息
+        //TODO shutdown 对fd 如何使用?
     }
 
 private:

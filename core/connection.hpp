@@ -27,6 +27,7 @@ namespace rojcpp {
 
     using http_handler        = std::function<void(request&, response&)>;
     using http_handler_check  = std::function<bool(request&, response&,bool)>;
+    using ws_connection_check = std::function<bool(request&, response&)>;
     using send_ok_handler     = std::function<void()>;
     using send_failed_handler = std::function<void(const int&)>;
     using upload_check_handler= std::function<bool(request& req, response& res)>;
@@ -73,12 +74,14 @@ namespace rojcpp {
                 long keep_alive_timeout,
                 http_handler* handler,      //http_handler  的函数指针
                 http_handler_check * handler_check, // http_handler_check 的函数指针
+                ws_connection_check * ws_conn_check,
                 std::string& static_dir,    //静态资源目录
                 upload_check_handler * upload_check //上传查询
             )
             :
             MAX_REQ_SIZE_(max_req_size), KEEP_ALIVE_TIMEOUT_(keep_alive_timeout),
             http_handler_(handler), http_handler_check_(handler_check),
+            ws_connection_check_(ws_conn_check),
             req_(res_), static_dir_(static_dir), upload_check_(upload_check)
         {
             init_multipart_parser(); //初始化 multipart 解析器
@@ -948,10 +951,22 @@ namespace rojcpp {
         //处理 只有 headers 的情况
         bool handle_header_request() {
             if (is_upgrade_) { //websocket
+                //TODO 增加一个检查是否可以进行websock连接的函数
+                // 注意!! 这里使用了 route的_ap
+                // 1. 是否有 before ap ,没有不可以ws
+                // 2. 执行before ap
+                //
+                if( ws_connection_check_ != nullptr
+                    && (*ws_connection_check_)(req_,res_) == false ) {
+                    is_upgrade_ = false;
+                    keep_alive_ = false;
+                    res_.set_status_and_content(status_type::forbidden,"not allowed");
+                    return TO_EPOLL_WRITE;
+                }
                 req_.set_http_type(content_type::websocket);
                 //timer_.cancel();
-                ws_.upgrade_to_websocket(req_, res_);
-                response_handshake();
+                ws_.upgrade_to_websocket(req_, res_);   //生成 res_里的返回内容
+                response_handshake();           //写内容
                 return TO_EPOLL_READ;
             }
 
@@ -1326,9 +1341,12 @@ private:
         std::string chunked_header_; //响应时如果 chunked_header_ 的内容
         multipart_reader multipart_parser_;
         bool is_multi_part_file_;
+
         //callback handler to application layer
         http_handler* http_handler_ = nullptr;
         http_handler_check * http_handler_check_ = nullptr;
+        ws_connection_check * ws_connection_check_ = nullptr;
+
         std::function<bool(request& req, response& res)>* upload_check_ = nullptr;
         std::any tag_;
         std::function<void(request&, std::string&)> multipart_begin_ = nullptr;
