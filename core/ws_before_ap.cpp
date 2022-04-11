@@ -7,8 +7,9 @@ void websocket_before_ap_mananger::regist(std::string_view name, AP_Type &&ap){
 }
 
 bool websocket_before_ap_mananger::invoke(const std::string &url_name, request &req, response &res){
-    if( ap_container.count(url_name) != 0) {
-        return true;
+    auto func_iter = ap_container.find(url_name);
+    if( func_iter != ap_container.end()) {
+        return (func_iter->second)(req,res);
     }
     return false;
 }
