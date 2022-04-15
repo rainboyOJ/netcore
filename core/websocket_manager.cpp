@@ -26,4 +26,15 @@ bool WS_manager::unregist(std::string id,int fd){
     fd_set.erase(fd);
 }
 
+//@desc 通过注册的id 来发送信息
+void WS_manager::send_msg_by_id(std::string & id,std::string && msg,bool close){
+    auto id_iter = u_map.find(id);
+    if( id_iter != u_map.end() ){
+        send_ws_string( id_iter->second,msg,close);
+    }
+    else {
+        LOG_DEBUG("not find fd from id : %s",id.c_str());
+    }
+}
+
 } // namespace rojcpp end

@@ -38,6 +38,10 @@ public:
     //是否存活,是否存在
     bool is_alive(std::string_view id);
 
+    //@desc 通过注册的id 来发送信息
+    void send_msg_by_id(std::string & id,std::string && msg,bool close = false);
+
+
     //发送信息
     //fd 代表
     //1. 要发送的socket的 fd
