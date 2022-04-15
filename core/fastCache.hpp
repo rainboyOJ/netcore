@@ -146,7 +146,8 @@ public:
     std::tuple<bool, Val_t > get(Key_t&& key); 
 
     //@desc 追加
-    void append(Key_t&& key,Val_t&& _data,std::size_t expiration = 10);
+    template<typename K,typename V>
+    void append(K&& key,V&& _data,std::size_t expiration = 10);
 
 protected:
     //desc 检查每一个shard里过期的key
@@ -254,9 +255,10 @@ void
 }
 
 template<typename Key_t,typename Val_t ,std::size_t Shard_size>
+template<typename K,typename V>
 void
     Fastcache<Key_t,Val_t,Shard_size>::
-    append(Key_t&& key,Val_t&& val,std::size_t expiration)
+    append(K&& key,V&& val,std::size_t expiration)
 {
     std::size_t index = calc_index(std::forward<Key_t>(key));
     auto & _shard = m_shards[index];
