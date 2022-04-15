@@ -5,6 +5,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <filesystem>
+#include <fstream>
+
 namespace rojcpp {
     constexpr const size_t MAX_CACHE_SIZE = 100000;
 
@@ -26,26 +29,36 @@ namespace rojcpp {
             cache_time_[key] = std::time(nullptr) + max_cache_age_;
         }
 
+        //@desc 得到内容
         std::vector<std::string> get(const std::string& key) {
             std::unique_lock<std::mutex> lock(mtx_);
             auto time_it = cache_time_.find(key);
             auto it = cache_.find(key);
             auto now_time = std::time(nullptr);
-            if(time_it != cache_time_.end() && time_it->second >= now_time){
+            if(time_it != cache_time_.end() && time_it->second >= now_time){ //时间正确
                 return it == cache_.end() ? std::vector<std::string>{} : it->second;
             }else{
                 if(time_it != cache_time_.end() && it != cache_.end()){
-                    cur_it_ = cache_.erase(it);
+                    cur_it_ = cache_.erase(it); // 不删除时间?
                 }
                 return std::vector<std::string>{};
             }
+        }
+
+        //@desc dumps到文件中
+        void dumps_to_file(std::filesystem::path __file__){
+        }
+
+        //@desc 从加载到文件中加载
+        void load_from_file(std::filesystem::path __file__){
         }
 
         bool empty() {
             return cache_.empty();
         }
 
-        void update(const std::string& key) {
+        // 删除key
+        void del(const std::string& key) {
             std::unique_lock<std::mutex> lock(mtx_);
             auto it = cache_.find(key);
             if (it != cache_.end())
