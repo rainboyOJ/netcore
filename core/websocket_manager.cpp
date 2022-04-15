@@ -26,11 +26,28 @@ bool WS_manager::unregist(std::string id,int fd){
     fd_set.erase(fd);
 }
 
+int WS_manager::get_fd(const std::string & key){
+    std::lock_guard<std::mutex> lock(m_mutex);
+    auto it = u_map.find(key);
+    if( it == u_map.end() )
+        return -1; //没有找到
+    return it->second;
+}
+
+void WS_manager::close_by_key(const std::string &key){
+    auto _fd = get_fd(key);
+    if( _fd != -1)
+        this->Close(_fd);
+}
+
 //@desc 通过注册的id 来发送信息
 void WS_manager::send_msg_by_id(std::string & id,std::string && msg,bool close){
-    auto id_iter = u_map.find(id);
-    if( id_iter != u_map.end() ){
-        send_ws_string( id_iter->second,msg,close);
+    //std::cout << "=> send_msg_by_id , id: " << id << std::endl;
+    auto _fd = get_fd(id);
+    //std::cout << "=> send_msg_by_id id_iter.first :  " << id_iter->first << std::endl;
+    //std::cout << "=> send_msg_by_id id_iter.second:  " << id_iter->second << std::endl;
+    if( _fd != -1 ){
+        send_ws_string( _fd,msg,close);
     }
     else {
         LOG_DEBUG("not find fd from id : %s",id.c_str());

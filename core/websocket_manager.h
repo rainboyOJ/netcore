@@ -51,11 +51,19 @@ public:
         //hsp->get_conn()->send_ws_string(std::move(msg));
     }
 
+    //@desc 通过 key 得到注册的fd
+    //@retval -1 没有找到,其它,注册的值
+    int get_fd(const std::string & key);
+
     //template<typename... Fs>
     void send_ws_string(int fd,std::string msg,bool close = false) {
         //send_ws_msg(fd,std::move(msg), opcode::text, std::forward<Fs>(fs)...);
         send_ws_msg(fd,std::move(msg), opcode::text,close);
     }
+
+
+    //@desc 通过key值来关闭对应的web_socket
+    void close_by_key(const std::string &key);
 
     //关闭,发送关闭的信息
     static void Close(int fd){
