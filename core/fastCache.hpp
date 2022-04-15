@@ -67,8 +67,12 @@ class Fastcache {
         }
 
         //追加
-        void append(const Val_t & _data,std::size_t new_exp) {
+        //pre_split,是否在前面 添加一个 字符,固定为,
+        void append(const Val_t & _data,std::size_t new_exp,bool use_pre_split_char = true) {
             static_assert( has_append_member_function<Val_t,const Val_t &>::value ,"CacheItem append fail");
+
+            if( use_pre_split_char )
+                data.append(",");
             data.append(_data);
             expiration = new_exp;
         }
