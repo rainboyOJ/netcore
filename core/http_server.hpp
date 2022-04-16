@@ -12,13 +12,13 @@
 #include "ws_before_ap.h"
 #include "http_router.hpp"
 #include "http_cache.hpp"
-#include "timer.hpp" //定时器
+//#include "timer.hpp" //定时器
 #include "hs_utils.h"
 
-#ifdef __USE_SESSION__ //暂时没有实现这个功能
-#include "session_manager.hpp"
+//#ifdef __USE_SESSION__ //暂时没有实现这个功能
+//#include "session_manager.hpp" // 不在使用session_manager功能
 #include "cookie.hpp"
-#endif
+//#endif
 
 
 namespace rojcpp {
@@ -66,7 +66,7 @@ namespace rojcpp {
             http_cache::get().set_cache_max_age(86400); // 最大的cache时间
             init_conn_callback(); //初始化 连接的回掉函数 http_handler_ ,static_res_hander 静态资源hander
             //定时器
-            epoller_->AddFd(Timer::getInstance()->getfd0(), EPOLLIN );
+            //epoller_->AddFd(Timer::getInstance()->getfd0(), EPOLLIN );
         }
 
 
@@ -150,19 +150,6 @@ namespace rojcpp {
                     if(fd == listenFd_) {       //新的连接
                         DealListen_();
                     }
-                    // 定时事件
-                    else if ((fd == Timer::getInstance()->getfd0()) && (events & EPOLLIN))
-                    {
-                        //bool flag = dealwithsignal(timeout, stop_server);
-
-                        char signals[1024];
-                        int ret = recv(Timer::getInstance()->getfd0(), signals, sizeof(signals), 0);
-                        threadpool_->AddTask( std::bind(&http_server_::deal_sigal , this,int(signals[0])) );
-                        alarm(__config__::alarm_time); //alarm_time_ 检查一次
-                        //epoller_->ModFd(Timer::get->GetFd(), connEvent_ | EPOLLIN);
-                        //if (false == flag)
-                            //LOG_ERROR("%s", "dealclientdata failure");
-                    }
                     else if(events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) { //断开连接
                         LOG_INFO("break connection fd %d",fd);
                         assert(users_.count(fd) > 0);
@@ -181,22 +168,6 @@ namespace rojcpp {
                         LOG_ERROR("Unexpected event");
                     }
                 }
-            }
-        }
-
-        //处理定时任务
-        void deal_timer(){
-            //connection 的超时
-            //session_manager的超时
-        }
-
-        //信号处理
-        void deal_sigal(int sig){
-            //LOG_INFO("deal_sigal signal = %d\n",sig);
-            if( sig == SIGALRM) { // 
-                LOG_DEBUG("deal_sigal SIGALRM");
-                LOG_DEBUG("check session_manager expire");
-                session_manager::get().check_expire(); //检查session
             }
         }
 
