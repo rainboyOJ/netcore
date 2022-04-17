@@ -13,8 +13,9 @@
 #include "mime_types.hpp"
 #include "response.hpp"
 
-#include "session.hpp"
-#include "session_manager.hpp"
+
+//#include "session.hpp"
+//#include "session_manager.hpp"
 
 namespace rojcpp {
 
@@ -130,7 +131,7 @@ namespace rojcpp {
                 set_body_len(atoll(header_value.data()));
             }
 
-            auto cookie = get_header_value("cookie"); // TODO 应该去掉 
+            auto cookie = get_header_value("cookie"); 
             if (!cookie.empty()) {
                 cookie_str_ = std::string(cookie.data(), cookie.length());
             }
@@ -820,30 +821,33 @@ namespace rojcpp {
             return nullptr;
         }
 
-        //得到cookies
+        //@desc 得到cookies
         std::map<std::string_view, std::string_view> get_cookies() const
         {
-            //auto cookies_str = get_header_value("cookie");
             auto cookies = get_cookies_map(cookie_str_);
             return cookies;
         }
 
-        std::weak_ptr<session> get_session(const std::string& name)
-        {
-            auto cookies = get_cookies();
-            auto iter = cookies.find(name);
-            std::weak_ptr<session> ref;
-            if(iter!=cookies.end())
-            {
-                ref = session_manager::get().get_session(std::string(iter->second.data(), iter->second.length()));
+        //@desc 得到cookie 中的值
+        std::string_view get_cookie_value() {
+            std::string value;
+            auto pos= cookie_str_.find(CSESSIONIDWithEQU);
+            if( pos == std::string::npos )
+                return {}; //空的没有
+
+            auto iter = cookie_str_.begin() + pos + CSESSIONIDWithEQU.length();
+            auto point = cookie_str_.data() + pos + CSESSIONIDWithEQU.length();
+            std::size_t cnt{0};
+            for( ; iter != cookie_str_.end() ; ++iter ){
+                if( *iter == ';') break;
+                ++cnt;
             }
-            res_.set_session(ref);
-            return ref;
+            return std::string_view{point,cnt};
         }
 
-        std::weak_ptr<session> get_session()
-        {
-            return get_session(CSESSIONID);
+        //表示 res 需要返回时 携带cookie
+        void session_need_update() {
+            res_.set_session_id(get_cookie_value());
         }
 
         void set_range_flag(bool flag)

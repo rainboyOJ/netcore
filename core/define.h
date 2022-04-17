@@ -42,6 +42,7 @@ namespace rojcpp {
 
     inline const std::string_view STATIC_RESOURCE = "rojcpp_static_resource";
     inline const std::string CSESSIONID = "CSESSIONID";
+    inline const std::string CSESSIONIDWithEQU = "CSESSIONID=";
 
     const static inline std::string CRCF = "\r\n";
     const static inline std::string TWO_CRCF = "\r\n\r\n";

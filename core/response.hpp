@@ -17,8 +17,10 @@
 #include "http_cache.hpp"
 #include "use_asio.hpp"
 #include "picohttpparser.h"
+#include "cookie.hpp"
+#include "fastCache.hpp"
 
-#include "session_manager.hpp"
+//#include "session_manager.hpp"
 
 
 namespace rojcpp {
@@ -103,10 +105,9 @@ namespace rojcpp {
             }
             rep_str_.append("Server: rojcpp\r\n");
 
-            if (session_ != nullptr && session_->is_need_update()) {
-                auto cookie_str = session_->get_cookie().to_string();
+            if( cookie_sh_ptr != nullptr ){
+                auto cookie_str = cookie_sh_ptr -> to_string();
                 rep_str_.append("Set-Cookie: ").append(cookie_str).append("\r\n");
-                session_->set_need_update(false);
             }
 
             if (need_response_time_)
@@ -122,11 +123,9 @@ namespace rojcpp {
             std::vector<std::string> buffers;
             add_header("Host", "rojcpp");
 
-            if(session_ != nullptr && session_->is_need_update())
-            {
-                auto cookie_str = session_->get_cookie().to_string();
-                add_header("Set-Cookie",cookie_str.c_str());
-                session_->set_need_update(false);
+            if( cookie_sh_ptr != nullptr ){
+                auto cookie_str = cookie_sh_ptr -> to_string();
+                rep_str_.append("Set-Cookie: ").append(cookie_str).append("\r\n");
             }
             
             buffers.reserve(headers_.size() * 4 + 5);
@@ -244,11 +243,16 @@ namespace rojcpp {
             headers_.clear();
             content_.clear();
             keep_alive_ = false;
-            session_ = nullptr;
 
             if(cache_data.empty())
                 cache_data.clear();
+            //session_id_.clear(); //置空
+            cookie_sh_ptr = nullptr;
         }
+
+        //void set_session_id(std::string_view id){
+            //session_id_ = "session_" + std::string(id);
+        //}
 
         void set_keep_alive(bool kal){
             keep_alive_ = kal;
@@ -297,25 +301,17 @@ namespace rojcpp {
             return buffers_;
         }
 
-        std::shared_ptr<rojcpp::session> start_session(const std::string& name, std::time_t expire = -1,std::string_view domain = "", const std::string &path = "/")
-        {
-            session_ = session_manager::get().create_session(domain, name, expire, path);
-            return session_;
-        }
-
-        std::shared_ptr<rojcpp::session> start_session()
-        {
-            if (domain_.empty()) {
-                auto host = get_header_value("host");
-                if (!host.empty()) {
-                    size_t pos = host.find(':');
-                    if (pos != std::string_view::npos) {
-                        set_domain(host.substr(0, pos));
-                    }
-                }
-            }
-            session_ = session_manager::get().create_session(domain_, CSESSIONID,__config__::session_expire);
-            return session_;
+        // params 就是cookie 携带的uuid的值
+        //创建了session
+        void create_session(const std::string & uuid){
+            auto cok_ptr = std::make_shared<cookie>(CSESSIONID,uuid);
+            cok_ptr -> set_domain("/");
+            std::time_t now = std::time(nullptr); //创建时间
+            auto time_stamp_     = __config__::session_expire + now;
+            cok_ptr -> set_max_age(__config__::session_expire == -1 ? -1 : time_stamp_);
+            // 不需要用cache
+            //Cache::get().set(std::string("session_") + uuid, cok_ptr -> to_string());
+            cookie_sh_ptr = cok_ptr;
         }
 
         void set_domain(std::string_view domain) {
@@ -376,17 +372,8 @@ namespace rojcpp {
             set_status_and_content(status_type::temporary_redirect);
         }
 
-        void set_session(std::weak_ptr<rojcpp::session> sessionref)
-        {
-            if(sessionref.lock()){
-                session_ = sessionref.lock();
-            }
-        }
-        auto& session(){
-            return session_;
-        }
-
     private:
+
         std::string_view get_header_value(std::string_view key) const {
             phr_header* headers = req_headers_.first;
             size_t num_headers = req_headers_.second;
@@ -394,7 +381,6 @@ namespace rojcpp {
                 if (iequal(headers[i].name, headers[i].name_len, key.data(), key.length()))
                     return std::string_view(headers[i].value, headers[i].value_len);
             }
-
             return {};
         }
 
@@ -412,13 +398,14 @@ namespace rojcpp {
         std::pair<phr_header*, size_t> req_headers_;
         std::string_view domain_;
         std::string_view path_;
-        std::shared_ptr<rojcpp::session> session_ = nullptr;
         std::string rep_str_;
         std::chrono::system_clock::time_point last_time_ = std::chrono::system_clock::now();
         std::string last_date_str_;
         req_content_type res_type_;
         bool keep_alive_ = false;
         bool need_response_time_ = false;
+        //std::string session_id_{}; //存在fastCache 上的session_id
+        std::shared_ptr<cookie> cookie_sh_ptr = nullptr;
     };
 }
 #endif //CINATRA_RESPONSE_HPP

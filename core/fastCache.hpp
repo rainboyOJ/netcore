@@ -276,5 +276,33 @@ void
     }
 }
 
+//单例模式的Cache
+class Cache {
+public:
+    
+    // del other ctor
+    Cache(const Cache &) = delete;
+    Cache(Cache &&) = delete;
+    void operator=(const Cache& ) = delete;
+    void operator=(Cache&& ) = delete;
+
+    using cacheType = rojcpp::Fastcache<
+        std::string,    //key type
+        std::string,    //value type
+        32>;            //shard size 分片数量
+
+    static cacheType& get() {
+        static cacheType catche;
+        return catche;
+    }
+
+private:
+    Cache() = default;
+};
+
+
 } // end namespace rojcpp
+
+
+
 
