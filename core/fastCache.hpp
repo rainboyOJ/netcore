@@ -134,7 +134,7 @@ public:
     std::size_t total_size();
 
     //@desc 设定一个值
-    void set(Key_t&& key,Val_t&& val,std::size_t expiration = 10);
+    void set(const Key_t& key,Val_t&& val,std::size_t expiration = 10);
 
     //@desc key是否存在
     bool exists(Key_t&& key);
@@ -143,7 +143,7 @@ public:
     std::size_t del(Key_t&& key);
 
     //@desc 得到一个key的值
-    std::tuple<bool, Val_t > get(Key_t&& key); 
+    std::tuple<bool, Val_t > get(const Key_t& key); 
 
     //@desc 追加
     template<typename K,typename V>
@@ -154,7 +154,7 @@ protected:
     void expired_check_func();
 
     //@desc 计算key对应的分片
-    inline std::size_t calc_index(Key_t&& key);
+    inline std::size_t calc_index(const Key_t& key);
 private:
     std::hash<Key_t> m_hash_tool;
     std::vector<Shard> m_shards;
@@ -165,7 +165,7 @@ private:
 template<typename Key_t,typename Val_t ,std::size_t Shard_size>
 std::size_t 
     Fastcache<Key_t,Val_t,Shard_size>::
-    calc_index(Key_t&& key)
+    calc_index(const Key_t& key)
 {
     return m_hash_tool(key) % Shard_size;
 }
@@ -186,9 +186,9 @@ std::size_t
 
 template<typename Key_t,typename Val_t ,std::size_t Shard_size>
 void Fastcache<Key_t,Val_t,Shard_size>::
-    set(Key_t&& key,Val_t&& val,std::size_t expiration)
+    set(const Key_t & key,Val_t&& val,std::size_t expiration)
 {
-    std::size_t index = calc_index(std::forward<Key_t>(key));
+    std::size_t index = calc_index(key);
     auto & _shard = m_shards[index];
     std::lock_guard<std::mutex> lck(_shard.mtx);
     _shard._container[key] 
@@ -220,9 +220,9 @@ std::size_t
 template<typename Key_t,typename Val_t ,std::size_t Shard_size>
 std::tuple<bool, Val_t > 
     Fastcache<Key_t,Val_t,Shard_size>::
-    get(Key_t&& key)
+    get(const Key_t& key)
 {
-    std::size_t index = calc_index(std::forward<Key_t>(key));
+    std::size_t index = calc_index(key);
     auto & _shard = m_shards[index];
     std::lock_guard<std::mutex> lck(_shard.mtx);
     try {
