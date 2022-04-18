@@ -303,12 +303,14 @@ namespace rojcpp {
 
         // params 就是cookie 携带的uuid的值
         //创建了session
-        void create_session(const std::string & uuid){
+        void create_session(const std::string & uuid,
+                        uint64_t expire_time = __config__::session_expire
+                ){
             auto cok_ptr = std::make_shared<cookie>(CSESSIONID,uuid);
             cok_ptr -> set_domain("/");
             std::time_t now = std::time(nullptr); //创建时间
-            auto time_stamp_     = __config__::session_expire + now;
-            cok_ptr -> set_max_age(__config__::session_expire == -1 ? -1 : time_stamp_);
+            auto time_stamp_     = expire_time + now;
+            cok_ptr -> set_max_age(expire_time == -1 ? -1 : time_stamp_);
             cok_ptr -> set_domain("");
             cok_ptr -> set_path("/");
             cok_ptr -> set_version(0);
