@@ -845,11 +845,6 @@ namespace rojcpp {
             return std::string_view{point,cnt};
         }
 
-        //表示 res 需要返回时 携带cookie
-        void session_need_update() {
-            res_.set_session_id(get_cookie_value());
-        }
-
         void set_range_flag(bool flag)
         {
             is_range_resource_ = flag;
