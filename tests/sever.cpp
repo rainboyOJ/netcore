@@ -5,12 +5,12 @@
 using namespace rojcpp;
 struct check_login {
     bool before(request& req,response& rep){
-        auto weak_session = req.get_session();
-        if( auto session = weak_session.lock(); session != nullptr){
-            auto isLogin = session->get_data<bool>("isLogin");
-            if( isLogin ) return true;
-        }
-        rep.set_status_and_content(status_type::ok,"your are not logined!",req_content_type::string);
+        //auto weak_session = req.get_session();
+        //if( auto session = weak_session.lock(); session != nullptr){
+            //auto isLogin = session->get_data<bool>("isLogin");
+            //if( isLogin ) return true;
+        //}
+        //rep.set_status_and_content(status_type::ok,"your are not logined!",req_content_type::string);
         return false;
     }
 };
@@ -41,16 +41,16 @@ int main(){
 
     Server.set_http_handler<POST>("/login",
             [](request & req,response & res){
-                auto weak_session = req.get_session();
-                if( auto session = weak_session.lock(); session != nullptr){
-                    auto isLogin = session->get_data<bool>("isLogin");
-                    if( isLogin ) {
-                        res.set_status_and_content(status_type::ok,"you have logined!",req_content_type::string);
-                        return ;
-                    }
-                }
-                auto session = res.start_session();
-                session->set_data("isLogin", true);
+                //auto weak_session = req.get_session();
+                //if( auto session = weak_session.lock(); session != nullptr){
+                    //auto isLogin = session->get_data<bool>("isLogin");
+                    //if( isLogin ) {
+                        //res.set_status_and_content(status_type::ok,"you have logined!",req_content_type::string);
+                        //return ;
+                    //}
+                //}
+                //auto session = res.start_session();
+                //session->set_data("isLogin", true);
                 res.set_status_and_content(status_type::ok,"yes,now logined",req_content_type::string);
             });
 
@@ -68,16 +68,16 @@ int main(){
 
     Server.set_http_handler<POST>("/signout",
             [](request & req,response & res){
-                auto weak_session = req.get_session();
-                if( auto session = weak_session.lock(); session != nullptr){
-                    auto isLogin = session->get_data<bool>("isLogin");
-                    if( isLogin ) {
-                        res.set_status_and_content(status_type::ok,"you have logined!",req_content_type::string);
-                        return ;
-                    }
-                }
-                auto session = res.start_session();
-                session->set_data("isLogin", true);
+                //auto weak_session = req.get_session();
+                //if( auto session = weak_session.lock(); session != nullptr){
+                    //auto isLogin = session->get_data<bool>("isLogin");
+                    //if( isLogin ) {
+                        //res.set_status_and_content(status_type::ok,"you have logined!",req_content_type::string);
+                        //return ;
+                    //}
+                //}
+                //auto session = res.start_session();
+                //session->set_data("isLogin", true);
                 res.set_status_and_content(status_type::ok,"yes,now logined",req_content_type::string);
             });
 
