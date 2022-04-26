@@ -9,7 +9,7 @@
  * is_upgrade
  */
 
-namespace rojcpp {
+namespace netcore {
     class websocket {
     public:
         const bool is_fin() const{

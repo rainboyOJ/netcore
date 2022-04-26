@@ -2,7 +2,7 @@
 #include <fstream>
 #include <string>
 #include "utils.hpp"
-namespace rojcpp {
+namespace netcore {
     class upload_file {
     public:
         void write(const char* data, size_t size) {
@@ -86,7 +86,7 @@ namespace rojcpp {
     private:
         void check_and_create_directory(const std::string& direcotry_path) const
         {
-           auto vec = rojcpp::split(std::string_view(direcotry_path.data(),direcotry_path.size()),"/");
+           auto vec = netcore::split(std::string_view(direcotry_path.data(),direcotry_path.size()),"/");
            std::string tmp_directory = "";
             for(auto iter=vec.begin();iter!=vec.end();++iter){
                 tmp_directory+=std::string(iter->data(),iter->size())+"/";

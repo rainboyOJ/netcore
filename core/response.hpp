@@ -23,7 +23,7 @@
 //#include "session_manager.hpp"
 
 
-namespace rojcpp {
+namespace netcore {
     class response {
     public:
         response() {
@@ -103,7 +103,7 @@ namespace rojcpp {
             if(res_type_!= req_content_type::none){
                 rep_str_.append(get_content_type(res_type_));
             }
-            rep_str_.append("Server: rojcpp\r\n");
+            rep_str_.append("Server: netcore\r\n");
 
             if( cookie_sh_ptr != nullptr ){
                 auto cookie_str = cookie_sh_ptr -> to_string();
@@ -121,7 +121,7 @@ namespace rojcpp {
         //转成buffers TODO 这个函数要改
         std::vector<std::string> to_buffers() {
             std::vector<std::string> buffers;
-            add_header("Host", "rojcpp");
+            add_header("Host", "netcore");
 
             if( cookie_sh_ptr != nullptr ){
                 auto cookie_str = cookie_sh_ptr -> to_string();
@@ -213,15 +213,15 @@ namespace rojcpp {
         //得到内容的类型
         std::string_view get_content_type(req_content_type type){
             switch (type) {
-                case rojcpp::req_content_type::html:
+                case netcore::req_content_type::html:
                     return rep_html;
-                case rojcpp::req_content_type::json:
+                case netcore::req_content_type::json:
                     return rep_json;
-                case rojcpp::req_content_type::string:
+                case netcore::req_content_type::string:
                     return rep_string;
-                case rojcpp::req_content_type::multipart:
+                case netcore::req_content_type::multipart:
                     return rep_multipart;
-                case rojcpp::req_content_type::none:
+                case netcore::req_content_type::none:
                 default:
                     return "";
             }

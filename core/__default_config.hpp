@@ -31,7 +31,7 @@ struct __config__{
     static constexpr int sqlPort         = 3306;
     static constexpr const char* sqlUser = "root";
     static constexpr const  char* sqlPwd = "root";
-    static constexpr const char* dbName  = "rojcpp";
+    static constexpr const char* dbName  = "netcore";
     static constexpr int connPoolNum     = 4;
     static constexpr int threadNum       = 4;
     static constexpr bool openLog        = true;

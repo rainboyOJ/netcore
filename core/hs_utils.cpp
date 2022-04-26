@@ -1,7 +1,7 @@
 // 有关文件下载的函数
 #include "hs_utils.h"
 
-namespace rojcpp {
+namespace netcore {
     
 
 std::string get_send_data(request& req, const size_t len){
@@ -117,7 +117,7 @@ void process_download(std::string& file_path,request& req,response& res){
     auto state = req.get_state(); 
     switch (state) {
         //数据开始
-        case rojcpp::data_proc_state::data_begin:
+        case netcore::data_proc_state::data_begin:
             {
                 //std::string relative_file_name = req.get_relative_filename();
                 //std::string fullpath = std::string(__config__::static_dir) + relative_file_name;
@@ -154,7 +154,7 @@ void process_download(std::string& file_path,request& req,response& res){
             }
             break;
             //数据继续,就写完header 后写body?
-        case rojcpp::data_proc_state::data_continue:
+        case netcore::data_proc_state::data_continue:
             {
                 if constexpr (__config__::transfer_type_ == transfer_type::CHUNKED)
                     write_chunked_body(req); //写 body
@@ -163,16 +163,16 @@ void process_download(std::string& file_path,request& req,response& res){
             }
             break;
             //数据结束
-        case rojcpp::data_proc_state::data_end:
+        case netcore::data_proc_state::data_end:
             {
                 auto conn = req.get_conn();
                 conn->clear_continue_workd(); // 结束
             }
             break;
             //数据错误
-        case rojcpp::data_proc_state::data_error:
+        case netcore::data_proc_state::data_error:
             {
-                LOG_ERROR("rojcpp::data_proc_state::data_error");
+                LOG_ERROR("netcore::data_proc_state::data_error");
                 req.set_state(data_proc_state::data_error);
                 req.get_conn()->clear_continue_workd();
                 res.set_status_and_content(status_type::bad_request, "data proce data error");
@@ -182,4 +182,4 @@ void process_download(std::string& file_path,request& req,response& res){
     }
 }
 
-} // end namespace rojcpp
+} // end namespace netcore

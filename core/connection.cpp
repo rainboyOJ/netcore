@@ -1,6 +1,6 @@
 #include "connection.hpp"
 
-namespace rojcpp {
+namespace netcore {
         std::atomic<int> HttpConn::userCount = 0;
 
 //-------------web socket----------------//
@@ -173,14 +173,14 @@ bool connection::do_read_websocket_data() {
 bool connection::handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred ) {
     switch (ret)
     {
-        case rojcpp::ws_frame_type::WS_ERROR_FRAME:
+        case netcore::ws_frame_type::WS_ERROR_FRAME:
             req_.call_event(data_proc_state::data_error);
             Close(); /// TODO 关闭
             return false;
-        case rojcpp::ws_frame_type::WS_OPENING_FRAME:
+        case netcore::ws_frame_type::WS_OPENING_FRAME:
             break;
-        case rojcpp::ws_frame_type::WS_TEXT_FRAME:
-        case rojcpp::ws_frame_type::WS_BINARY_FRAME:
+        case netcore::ws_frame_type::WS_TEXT_FRAME:
+        case netcore::ws_frame_type::WS_BINARY_FRAME:
             {
                 //reset_timer();
                 std::string temp;
@@ -193,7 +193,7 @@ bool connection::handle_ws_frame(ws_frame_type ret, std::string&& payload, size_
             }
             //on message
             break;
-        case rojcpp::ws_frame_type::WS_CLOSE_FRAME:
+        case netcore::ws_frame_type::WS_CLOSE_FRAME:
             {
                 LOG_DEBUG("handle_ws_frame type : ws_frame_type::WS_CLOSE_FRAME");
                 close_frame close_frame = ws_.parse_close_payload(payload.data(), payload.length());
@@ -209,14 +209,14 @@ bool connection::handle_ws_frame(ws_frame_type ret, std::string&& payload, size_
                 //send_msg(std::move(header), std::move(close_msg),true); //发送
             }
             break;
-        case rojcpp::ws_frame_type::WS_PING_FRAME:
+        case netcore::ws_frame_type::WS_PING_FRAME:
             {
                 auto header = ws_.format_header(payload.length(), opcode::pong);
                 //send_msg(std::move(header), std::move(payload));
                 WS_manager::get_instance().send_ws_string(GetFd(), header+payload);
             }
             break;
-        case rojcpp::ws_frame_type::WS_PONG_FRAME:
+        case netcore::ws_frame_type::WS_PONG_FRAME:
             ws_ping();
             break;
         default:
@@ -243,5 +243,5 @@ void connection::ws_ping() {
 
 
 
-} // end namespace rojcpp
+} // end namespace netcore
 

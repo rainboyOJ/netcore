@@ -2,7 +2,7 @@
 #include "http_server.hpp"
 #include "websocket_manager.h"
 
-using namespace rojcpp;
+using namespace netcore;
 struct check_login {
     bool before(request& req,response& rep){
         //auto weak_session = req.get_session();
@@ -16,10 +16,10 @@ struct check_login {
 };
 
 //创建一个全局的服务器
-rojcpp::http_server_ Server;
+netcore::http_server_ Server;
 int main(){
     Server.set_http_handler<GET>("/helloworld",[](request & req,response & res){
-            res.set_status_and_content(status_type::ok,"hello world,this rojcpp Server",req_content_type::string);
+            res.set_status_and_content(status_type::ok,"hello world,this netcore Server",req_content_type::string);
     });
 
     //while_char

@@ -5,7 +5,7 @@
 #include <filesystem>
 #include "connection.hpp"
 
-namespace rojcpp {
+namespace netcore {
 
 /**
  * @brief 得到长度为len的数据
@@ -32,4 +32,4 @@ void write_ranges_data(request& req);
 void process_download(std::string& file_path,request& req,response& rep);
 
 
-} // end namespace rojcpp
+} // end namespace netcore

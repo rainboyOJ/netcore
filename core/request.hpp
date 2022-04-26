@@ -17,7 +17,7 @@
 //#include "session.hpp"
 //#include "session_manager.hpp"
 
-namespace rojcpp {
+namespace netcore {
 
     //表示数据处理的状态
     enum class data_proc_state : int8_t { 
@@ -1018,4 +1018,4 @@ namespace rojcpp {
         std::array<event_call_back, (size_t)data_proc_state::data_error + 1> event_call_backs_ = {};
     };
 
-} // end of namespace rojcpp
+} // end of namespace netcore

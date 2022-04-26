@@ -2,7 +2,7 @@
 #include <string>
 #include "utils.hpp"
 
-namespace rojcpp {
+namespace netcore {
     class cookie {
     public:
         cookie() = default;

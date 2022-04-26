@@ -1,7 +1,7 @@
 #pragma once
 #include "http_client.hpp"
 
-namespace rojcpp {
+namespace netcore {
     
 	class client_factory {
 	public:
@@ -25,5 +25,5 @@ namespace rojcpp {
 		client_factory& operator=(client_factory&&) = delete;
 
 	};
-} // end namespace rojcpp
+} // end namespace netcore
 

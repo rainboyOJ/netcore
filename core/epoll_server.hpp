@@ -17,7 +17,7 @@
 #include "epoller.h"
 #include "heaptimer.h"
 
-namespace rojcpp {
+namespace netcore {
     
 template<typename HttpConn>
 class epoll_server {
@@ -352,4 +352,4 @@ int epoll_server<HttpConn>::SetFdNonblock(int fd) {
 }
 
 
-} // end namespace rojcpp
+} // end namespace netcore

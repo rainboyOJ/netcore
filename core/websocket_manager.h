@@ -15,7 +15,7 @@
 #include "websocket.hpp"
 
 
-namespace rojcpp {
+namespace netcore {
 
 class WS_manager {
 public:
@@ -117,4 +117,4 @@ private:
     std::set<int> fd_set;
 };
 
-} // namespace rojcpp end
+} // namespace netcore end

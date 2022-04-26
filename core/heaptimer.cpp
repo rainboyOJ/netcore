@@ -1,6 +1,6 @@
 #include "heaptimer.h"
 
-namespace rojcpp {
+namespace netcore {
 
 void HeapTimer::siftup_(size_t i) {
     assert(i >= 0 && i < heap_.size());
@@ -130,4 +130,4 @@ int HeapTimer::GetNextTick() {
     return res;
 }
 
-} // end namespace rojcpp
+} // end namespace netcore

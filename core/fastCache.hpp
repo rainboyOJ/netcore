@@ -21,7 +21,7 @@
 #include <chrono>
 #include <cxxabi.h>
 
-namespace rojcpp {
+namespace netcore {
 
 
 #define GET_TYPE_NAME(type) abi::__cxa_demangle(typeid(type).name(),0,0,0)
@@ -286,7 +286,7 @@ public:
     void operator=(const Cache& ) = delete;
     void operator=(Cache&& ) = delete;
 
-    using cacheType = rojcpp::Fastcache<
+    using cacheType = netcore::Fastcache<
         std::string,    //key type
         std::string,    //value type
         32>;            //shard size 分片数量
@@ -301,7 +301,7 @@ private:
 };
 
 
-} // end namespace rojcpp
+} // end namespace netcore
 
 
 

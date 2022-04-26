@@ -1,7 +1,7 @@
 // 有关文件下载的函数
 #include "http_server.hpp"
 
-namespace rojcpp {
+namespace netcore {
 
 //设置 静态资源hander
 void http_server_::set_static_res_handler() {
@@ -22,4 +22,4 @@ void http_server_::set_static_res_handler() {
 }
 
 
-} // end namespace rojcpp
+} // end namespace netcore

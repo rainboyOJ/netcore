@@ -1,6 +1,6 @@
 #include "ws_before_ap.h"
 
-using namespace rojcpp;
+using namespace netcore;
 int main(){
     websocket_before_ap_mananger ws_ap_manger;
     // 注册

@@ -4,7 +4,7 @@
 #include <string_view>
 #include <arpa/inet.h>
 
-namespace rojcpp {
+namespace netcore {
     using namespace std::string_view_literals;
 
 #if defined(_WIN32)

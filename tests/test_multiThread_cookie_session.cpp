@@ -9,7 +9,7 @@
 
 using namespace std;
 
-using namespace rojcpp;
+using namespace netcore;
 
 struct Random {
     random_device rd;

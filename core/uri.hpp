@@ -6,7 +6,7 @@
 
 #include "utils.hpp"
 
-namespace rojcpp {
+namespace netcore {
     //most of this code is from cpprestsdk
     class uri_t {
     public:

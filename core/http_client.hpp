@@ -161,7 +161,7 @@ class CTcpClient
         char buf[1024]{0};
 };
 
-namespace rojcpp {
+namespace netcore {
     struct response_data {
         int ec;
         int status;

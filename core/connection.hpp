@@ -23,7 +23,7 @@
 
 #define TO_EPOLL_WRITE  true
 #define TO_EPOLL_READ  false
-namespace rojcpp {
+namespace netcore {
 
     using http_handler        = std::function<void(request&, response&)>;
     using http_handler_check  = std::function<bool(request&, response&,bool)>;
@@ -337,19 +337,19 @@ namespace rojcpp {
                 auto type = get_content_type();
                 req_.set_http_type(type);
                 switch (type) {
-                case rojcpp::content_type::string:
-                case rojcpp::content_type::json:
-                case rojcpp::content_type::unknown:
+                case netcore::content_type::string:
+                case netcore::content_type::json:
+                case netcore::content_type::unknown:
                     return handle_string_body(bytes_transferred);
-                case rojcpp::content_type::multipart:
+                case netcore::content_type::multipart:
                     return handle_multipart();
-                case rojcpp::content_type::octet_stream:
+                case netcore::content_type::octet_stream:
                     handle_octet_stream(bytes_transferred);
                     break;
-                case rojcpp::content_type::urlencoded:
+                case netcore::content_type::urlencoded:
                     handle_form_urlencoded(bytes_transferred);
                     break;
-                case rojcpp::content_type::chunked:
+                case netcore::content_type::chunked:
                     handle_chunked(bytes_transferred);
                     break;
                 }

@@ -15,7 +15,7 @@
 #include "define.h"
 
 
-namespace rojcpp {
+namespace netcore {
 
     class session
     {
@@ -84,7 +84,7 @@ namespace rojcpp {
             set_max_age(0);
         }
 
-        rojcpp::cookie& get_cookie()
+        netcore::cookie& get_cookie()
         {
             return cookie_;
         }

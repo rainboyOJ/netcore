@@ -13,7 +13,7 @@
 #include "response.hpp"
 
 
-namespace rojcpp {
+namespace netcore {
 
 class websocket_before_ap_mananger {
 public:
@@ -33,5 +33,5 @@ private:
     std::unordered_map<std::string, AP_Type> ap_container;
 };
 
-} // end namespace rojcpp
+} // end namespace netcore
 

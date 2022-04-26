@@ -18,7 +18,7 @@
 #include <chrono>
 #include "log.h"
 
-namespace rojcpp {
+namespace netcore {
     
 
 typedef std::function<void()> TimeoutCallBack; //超时回调
@@ -56,5 +56,5 @@ private:
 };
 
 
-} // end namespace rojcpp
+} // end namespace netcore
 #endif //HEAP_TIMER_H

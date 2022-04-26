@@ -8,10 +8,10 @@ using namespace std;
 const std::string Server  = "http://localhost:8099";
 
 void test_hello_world(){
-    auto hc = rojcpp::client_factory::instance().new_client();
+    auto hc = netcore::client_factory::instance().new_client();
     auto res = hc->get(Server + "/helloworld");
     std::cout << res.resp_body << std::endl;
-    ok( res.resp_body == "hello world,this rojcpp Server","body ok");
+    ok( res.resp_body == "hello world,this netcore Server","body ok");
     auto [header,size] =  res.resp_headers ;
     std::cout << "headers: " << std::endl;
     for(int i=0;i<=size-1;++i){
@@ -22,7 +22,7 @@ void test_hello_world(){
 
 void test_regex_route(){
     for(int i=1;i<=5;++i){
-        auto hc = rojcpp::client_factory::instance().new_client();
+        auto hc = netcore::client_factory::instance().new_client();
         std::string url = Server + "/regex/hello/1";
         auto res = hc->get(url);
         std::string msg = std::to_string(i) + " regex body ok";
@@ -31,7 +31,7 @@ void test_regex_route(){
 }
 
 void test_upload_file(){
-    auto hc = rojcpp::client_factory::instance().new_client();
+    auto hc = netcore::client_factory::instance().new_client();
     //auto res = 
     //hc->upload_string(Server+"/upload", "test.cpp",10,nullptr);
     hc->upload_string(Server+"/upload", "test.cpp",5_MB,nullptr); //5MB

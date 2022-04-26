@@ -20,7 +20,7 @@
 #include "multipart_reader.hpp"
 #include "buffer.h"
 
-namespace rojcpp {
+namespace netcore {
     using http_handler        = std::function<void(request&, response&)>;
     using send_ok_handler     = std::function<void()>;
     using send_failed_handler = std::function<void(const int&)>;
@@ -382,20 +382,20 @@ namespace rojcpp {
                 auto type = get_content_type();
                 req_.set_http_type(type);
                 switch (type) {
-                case rojcpp::content_type::string:
-                case rojcpp::content_type::unknown:
+                case netcore::content_type::string:
+                case netcore::content_type::unknown:
                     handle_string_body(bytes_transferred);
                     break;
-                case rojcpp::content_type::multipart:
+                case netcore::content_type::multipart:
                     handle_multipart();
                     break;
-                case rojcpp::content_type::octet_stream:
+                case netcore::content_type::octet_stream:
                     handle_octet_stream(bytes_transferred);
                     break;
-                case rojcpp::content_type::urlencoded:
+                case netcore::content_type::urlencoded:
                     handle_form_urlencoded(bytes_transferred);
                     break;
-                case rojcpp::content_type::chunked:
+                case netcore::content_type::chunked:
                     handle_chunked(bytes_transferred);
                     break;
                 }
@@ -614,7 +614,7 @@ namespace rojcpp {
         }
 
         void close(bool close_ssl = true) {
-#ifdef rojcpp_ENABLE_SSL
+#ifdef netcore_ENABLE_SSL
             if (close_ssl && ssl_stream_) {
                 int ec;
                 ssl_stream_->shutdown(ec);
@@ -1131,14 +1131,14 @@ namespace rojcpp {
         bool handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred) {
             switch (ret)
             {
-            case rojcpp::ws_frame_type::WS_ERROR_FRAME:
+            case netcore::ws_frame_type::WS_ERROR_FRAME:
                 req_.call_event(data_proc_state::data_error);
                 close();
                 return false;
-            case rojcpp::ws_frame_type::WS_OPENING_FRAME:
+            case netcore::ws_frame_type::WS_OPENING_FRAME:
                 break;
-            case rojcpp::ws_frame_type::WS_TEXT_FRAME:
-            case rojcpp::ws_frame_type::WS_BINARY_FRAME:
+            case netcore::ws_frame_type::WS_TEXT_FRAME:
+            case netcore::ws_frame_type::WS_BINARY_FRAME:
             {
                 reset_timer();
                 std::string temp;
@@ -1151,7 +1151,7 @@ namespace rojcpp {
             }
             //on message
             break;
-            case rojcpp::ws_frame_type::WS_CLOSE_FRAME:
+            case netcore::ws_frame_type::WS_CLOSE_FRAME:
             {
                 close_frame close_frame = ws_.parse_close_payload(payload.data(), payload.length());
                 const int MAX_CLOSE_PAYLOAD = 123;
@@ -1164,13 +1164,13 @@ namespace rojcpp {
                 send_msg(std::move(header), std::move(close_msg));
             }
             break;
-            case rojcpp::ws_frame_type::WS_PING_FRAME:
+            case netcore::ws_frame_type::WS_PING_FRAME:
             {
                 auto header = ws_.format_header(payload.length(), opcode::pong);
                 send_msg(std::move(header), std::move(payload));
             }
             break;
-            case rojcpp::ws_frame_type::WS_PONG_FRAME:
+            case netcore::ws_frame_type::WS_PONG_FRAME:
                 ws_ping();
                 break;
             default:

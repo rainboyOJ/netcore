@@ -1,7 +1,7 @@
 #include "websocket_manager.h"
 
 
-namespace rojcpp {
+namespace netcore {
 
 bool WS_manager::regist(std::string id, int fd){
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -54,4 +54,4 @@ void WS_manager::send_msg_by_id(std::string & id,std::string && msg,bool close){
     }
 }
 
-} // namespace rojcpp end
+} // namespace netcore end

@@ -20,7 +20,7 @@
 
 #include "log.h"
 
-namespace rojcpp {
+namespace netcore {
 
 class Timer;
 
@@ -75,4 +75,4 @@ inline void sig_handler_wrapper(int sig){
     Timer::getInstance()->sig_handler(sig);
 }
 
-} // end namespace rojcpp
+} // end namespace netcore

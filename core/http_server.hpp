@@ -21,7 +21,7 @@
 //#endif
 
 
-namespace rojcpp {
+namespace netcore {
     
     //cache
     template<typename T>
@@ -43,7 +43,7 @@ namespace rojcpp {
                 //,__config__::sqlPort// sql的端口
                 //,__config__::sqlUser//"root" //const char *sqlUser,
                 //,__config__::sqlPwd//"root" //const char *sqlPwd,
-                //,__config__::dbName//"rojcpp" //const char *dbName,
+                //,__config__::dbName//"netcore" //const char *dbName,
                 //,__config__::connPoolNum//4//int connPoolNum,
                 ,__config__::threadNum//4//int threadNum,
                 ,__config__::openLog//true//bool openLog,

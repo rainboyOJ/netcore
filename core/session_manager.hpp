@@ -4,7 +4,7 @@
 #pragma once
 #include <thread>
 #include "session.hpp"
-namespace rojcpp {
+namespace netcore {
     class session_manager {
     public:
         static session_manager& get() { //单例模式

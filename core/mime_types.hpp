@@ -4,7 +4,7 @@
 #include "utils.hpp"
 #include "define.h"
 
-namespace rojcpp {
+namespace netcore {
     static const std::map<std::string_view, std::string_view,ci_less> mime_map ={
     { ".323", "text/h323" },
     { ".3gp", "video/3gpp" },
@@ -493,11 +493,11 @@ namespace rojcpp {
     { ".7z", "application/x-7z-compressed" },
     };
 
-    static std::map<rojcpp::req_content_type,std::string_view> res_mime_map = {
-            {rojcpp::req_content_type::html,"text/html; charset=UTF-8"},
-            {rojcpp::req_content_type::json,"application/json; charset=UTF-8"},
-            {rojcpp::req_content_type::string,"text/plain; charset=UTF-8"},
-            {rojcpp::req_content_type::multipart,"multipart/form-data; boundary="}
+    static std::map<netcore::req_content_type,std::string_view> res_mime_map = {
+            {netcore::req_content_type::html,"text/html; charset=UTF-8"},
+            {netcore::req_content_type::json,"application/json; charset=UTF-8"},
+            {netcore::req_content_type::string,"text/plain; charset=UTF-8"},
+            {netcore::req_content_type::multipart,"multipart/form-data; boundary="}
     };
 
     inline std::string_view get_mime_type(std::string_view extension) {

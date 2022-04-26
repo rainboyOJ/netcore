@@ -6,7 +6,7 @@
 // const variable
 
 //一些常用的关系量
-namespace rojcpp {
+namespace netcore {
     using  namespace std::literals;
     enum class status_type {
         init,
@@ -161,7 +161,7 @@ namespace rojcpp {
     inline constexpr std::string_view rep_close = "Connection: close     \r\n";
     inline constexpr std::string_view rep_len = "Content-Length: ";
     inline constexpr std::string_view rep_crcf = "\r\n";
-    inline constexpr std::string_view rep_server = "Server: rojcpp\r\n";
+    inline constexpr std::string_view rep_server = "Server: netcore\r\n";
 
     inline const char name_value_separator[] = { ':', ' ','\0' };
     //inline std::string_view crlf = "\r\n";
@@ -262,61 +262,61 @@ namespace rojcpp {
 
     inline constexpr std::string_view to_rep_string(status_type status) {
         switch (status) {
-        case rojcpp::status_type::switching_protocols:
+        case netcore::status_type::switching_protocols:
             return switching_protocols;
             break;
-        case rojcpp::status_type::ok:
+        case netcore::status_type::ok:
             return rep_ok;
             break;
-        case rojcpp::status_type::created:
+        case netcore::status_type::created:
             return rep_created;
             break;
-        case rojcpp::status_type::accepted:
+        case netcore::status_type::accepted:
             return rep_accepted;
             break;
-        case rojcpp::status_type::no_content:
+        case netcore::status_type::no_content:
             return rep_no_content;
             break;
-        case rojcpp::status_type::partial_content:
+        case netcore::status_type::partial_content:
             return rep_partial_content;
             break;
-        case rojcpp::status_type::multiple_choices:
+        case netcore::status_type::multiple_choices:
             return rep_multiple_choices;
             break;
-        case rojcpp::status_type::moved_permanently:
+        case netcore::status_type::moved_permanently:
             return rep_moved_permanently;
             break;
-        case rojcpp::status_type::moved_temporarily:
+        case netcore::status_type::moved_temporarily:
             return rep_moved_temporarily;
             break;
-        case rojcpp::status_type::not_modified:
+        case netcore::status_type::not_modified:
             return rep_not_modified;
             break;
-        case rojcpp::status_type::temporary_redirect:
+        case netcore::status_type::temporary_redirect:
             return rep_temporary_redirect;
             break;
-        case rojcpp::status_type::bad_request:
+        case netcore::status_type::bad_request:
             return rep_bad_request;
             break;
-        case rojcpp::status_type::unauthorized:
+        case netcore::status_type::unauthorized:
             return rep_unauthorized;
             break;
-        case rojcpp::status_type::forbidden:
+        case netcore::status_type::forbidden:
             return rep_forbidden;
             break;
-        case rojcpp::status_type::not_found:
+        case netcore::status_type::not_found:
             return rep_not_found;
             break;
-        case rojcpp::status_type::internal_server_error:
+        case netcore::status_type::internal_server_error:
             return rep_internal_server_error;
             break;
-        case rojcpp::status_type::not_implemented:
+        case netcore::status_type::not_implemented:
             return rep_not_implemented;
             break;
-        case rojcpp::status_type::bad_gateway:
+        case netcore::status_type::bad_gateway:
             return rep_bad_gateway;
             break;
-        case rojcpp::status_type::service_unavailable:
+        case netcore::status_type::service_unavailable:
             return rep_service_unavailable;
             break;
         default:

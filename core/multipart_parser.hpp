@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <cstring>
 
-namespace rojcpp {
+namespace netcore {
     class multipart_parser {
     public:
         typedef void(*Callback)(const char *buffer, size_t start, size_t end, void *userData);

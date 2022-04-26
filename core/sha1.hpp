@@ -12,7 +12,7 @@ Volker Grabsch (Translation to simpler C++ Code)
 Eugene Hopkinson (Safety improvements)
 Vincent Falco (beast adaptation)
 */
-namespace rojcpp {
+namespace netcore {
 namespace sha1 {
 
     static std::size_t constexpr BLOCK_INTS = 16;

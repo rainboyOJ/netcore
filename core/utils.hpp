@@ -2,8 +2,8 @@
 // Created by qiyu on 12/19/17.
 //
 
-#ifndef rojcpp_UTILS_HPP
-#define rojcpp_UTILS_HPP
+#ifndef netcore_UTILS_HPP
+#define netcore_UTILS_HPP
 
 #pragma once
 #include <string>
@@ -22,7 +22,7 @@
 #include <thread>
 #include "define.h"
 
-namespace rojcpp {
+namespace netcore {
     struct ci_less
     {
         // case-independent (ci) compare_less binary function
@@ -212,28 +212,28 @@ namespace rojcpp {
     inline constexpr std::string_view method_name(http_method mthd) {
         switch (mthd)
         {
-        case rojcpp::http_method::DEL:
+        case netcore::http_method::DEL:
             return "DELETE"sv;
             break;
-        case rojcpp::http_method::GET:
+        case netcore::http_method::GET:
             return "GET"sv;
             break;
-        case rojcpp::http_method::HEAD:
+        case netcore::http_method::HEAD:
             return "HEAD"sv;
             break;
-        case rojcpp::http_method::POST:
+        case netcore::http_method::POST:
             return "POST"sv;
             break;
-        case rojcpp::http_method::PUT:
+        case netcore::http_method::PUT:
             return "PUT"sv;
             break;
-        case rojcpp::http_method::CONNECT:
+        case netcore::http_method::CONNECT:
             return "CONNECT"sv;
             break;
-        case rojcpp::http_method::OPTIONS:
+        case netcore::http_method::OPTIONS:
             return "OPTIONS"sv;
             break;
-        case rojcpp::http_method::TRACE:
+        case netcore::http_method::TRACE:
             return "TRACE"sv;
             break;
         default:

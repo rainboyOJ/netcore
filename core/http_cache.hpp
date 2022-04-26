@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <fstream>
 
-namespace rojcpp {
+namespace netcore {
     constexpr const size_t MAX_CACHE_SIZE = 100000;
 
     class http_cache {
