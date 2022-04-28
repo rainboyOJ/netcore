@@ -19,7 +19,7 @@ bool WS_manager::regist(std::string id, int fd){
     return true;
 }
 
-bool WS_manager::unregist(std::string id,int fd){
+void WS_manager::unregist(std::string id,int fd){
     std::lock_guard<std::mutex> lock(m_mutex);
 
     u_map.erase(id);
@@ -50,7 +50,7 @@ void WS_manager::send_msg_by_id(std::string & id,std::string && msg,bool close){
         send_ws_string( _fd,msg,close);
     }
     else {
-        LOG_DEBUG("not find fd from id : %s",id.c_str());
+        LOG(DEBUG) << "not find fd from id : " << id;
     }
 }
 

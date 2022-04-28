@@ -5,6 +5,7 @@
 #include "__default_config.hpp"
 #endif
 
+#include "logWrapper.hpp"
 
 
 namespace fs = std::filesystem;

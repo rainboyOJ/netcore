@@ -24,15 +24,15 @@ void write_ranges_header(request& req, std::string_view mime, std::string filena
     header_str.append("Content-Type: ").append(mime).append("\r\n");//类型
     header_str.append("Content-Length: "); //长度
     header_str.append(file_size).append("\r\n\r\n"); //文件头结束
-    LOG_DEBUG("write_ranges_header :%s \n\n",header_str.c_str());
+    //LOG_DEBUG("write_ranges_header :%s \n\n",header_str.c_str());
     req.get_conn()->write_ranges_header(std::move(header_str)); //存入
 }
 
 void write_ranges_data(request& req) {
-    LOG_DEBUG("============ write_ranges_data");
+    //LOG_DEBUG("============ write_ranges_data");
     const size_t len = 3 * 1024 * 1024; // 默认3MB
     auto str = get_send_data(req, len);
-    LOG_DEBUG("============ write_ranges_data %s\n",str.c_str());
+    //LOG_DEBUG("============ write_ranges_data %s\n",str.c_str());
     auto read_len = str.size();
     bool eof = (read_len == 0 || read_len != len); // 是否结束
     req.get_conn()->write_ranges_data(std::move(str), eof);
@@ -172,7 +172,7 @@ void process_download(std::string& file_path,request& req,response& res){
             //数据错误
         case netcore::data_proc_state::data_error:
             {
-                LOG_ERROR("netcore::data_proc_state::data_error");
+                LOG(ERROR) << "netcore::data_proc_state::data_error";;
                 req.set_state(data_proc_state::data_error);
                 req.get_conn()->clear_continue_workd();
                 res.set_status_and_content(status_type::bad_request, "data proce data error");

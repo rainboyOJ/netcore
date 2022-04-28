@@ -7,7 +7,7 @@ namespace netcore {
 //@desc 返回握手信息,其实就是直接写数据
 void connection::response_handshake() {
     std::vector<std::string> buffers = res_.to_buffers();
-    LOG_DEBUG("response_handshake : %d",buffers.empty());
+    //LOG_DEBUG("response_handshake : %d",buffers.empty());
     std::string buf_to_send;
     if (buffers.empty()) {
         Close(); // TODO 这里要改 我们不主动的关闭自己
@@ -18,7 +18,7 @@ void connection::response_handshake() {
         //LOG_DEBUG("%s,%d",e.c_str(),e.length());
         buf_to_send.append(std::move(e));
     }
-    LOG_DEBUG("%s",buf_to_send.c_str());
+    //LOG_DEBUG("%s",buf_to_send.c_str());
     direct_write(buf_to_send.c_str(), buf_to_send.length());
     //set_continue_workd
     //continue_work_ = &connection::ws_response_handshake_continue_work;
@@ -56,7 +56,7 @@ bool connection::handle_ws_data(){
     std::size_t start = 0,end = req_.get_cur_size_();
 
     std::string ws_body;
-    LOG_DEBUG("handle_ws_data, req_.size %d,%d,%d",start,end,end-start);
+    //LOG_DEBUG("handle_ws_data, req_.size %d,%d,%d",start,end,end-start);
 
     do {
 
@@ -100,7 +100,7 @@ bool connection::handle_ws_data(){
     } while ( ws_.is_fin() == false );
 
     req_.set_current_size(0);
-    LOG_DEBUG("after set current_size ,%d",req_.get_cur_size_());
+    //LOG_DEBUG("after set current_size ,%d",req_.get_cur_size_());
     return TO_EPOLL_READ;
 }
 
@@ -195,7 +195,7 @@ bool connection::handle_ws_frame(ws_frame_type ret, std::string&& payload, size_
             break;
         case netcore::ws_frame_type::WS_CLOSE_FRAME:
             {
-                LOG_DEBUG("handle_ws_frame type : ws_frame_type::WS_CLOSE_FRAME");
+                //LOG_DEBUG("handle_ws_frame type : ws_frame_type::WS_CLOSE_FRAME");
                 close_frame close_frame = ws_.parse_close_payload(payload.data(), payload.length());
                 const int MAX_CLOSE_PAYLOAD = 123;
                 size_t len = std::min<size_t>(MAX_CLOSE_PAYLOAD, payload.length());

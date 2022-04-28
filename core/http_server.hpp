@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include "define.h"
-#include "heaptimer.h"
+//#include "heaptimer.h"
 
 #include "epoll_server.hpp" 
 #include "utils.hpp" 
@@ -124,7 +124,7 @@ namespace netcore {
 
 
             ws_connection_check_ = [this](request& req,response & res)->bool{
-                LOG_DEBUG("ws_connection_check_, url is %.*s",req.get_url().length(),req.get_url().data());
+                //LOG(DEBUG) << ("ws_connection_check_, url is %.*s",req.get_url().length(),req.get_url().data());
                 return  ws_before_ap.invoke(std::string(req.get_url()), req, res);
             };
         }
@@ -137,7 +137,7 @@ namespace netcore {
 
         virtual void Start() override {
             int timeMS = -1;  /* epoll wait timeout == -1 无事件将阻塞 */
-            if(!isClose_) { LOG_INFO("========== Server start =========="); }
+            if(!isClose_) { LOG(INFO) << ("========== Server start =========="); }
             while(!isClose_) {
                 if(timeoutMS_ > 0) {
                     timeMS = timer_->GetNextTick(); //TODO 这个timeMS 有什么用
@@ -151,21 +151,21 @@ namespace netcore {
                         DealListen_();
                     }
                     else if(events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) { //断开连接
-                        LOG_INFO("break connection fd %d",fd);
+                        LOG(INFO) << "break connection fd : " << fd;
                         assert(users_.count(fd) > 0);
                         CloseConn_(users_[fd].get());
                     }
                     else if(events & EPOLLIN) {         //有数据要读取
-                        LOG_INFO("read connection fd %d",fd);
+                        LOG(INFO) << "read connection fd : "<<fd;
                         assert(users_.count(fd) > 0);
                         DealRead_(users_[fd].get());
                     }
                     else if(events & EPOLLOUT) {        //数据写事件
-                        LOG_INFO("write connection fd %d",fd);
+                        LOG(INFO) << "write connection fd " << fd;
                         assert(users_.count(fd) > 0);
                         DealWrite_(users_[fd].get());
                     } else {
-                        LOG_ERROR("Unexpected event");
+                        LOG(ERROR) << ("Unexpected event");
                     }
                 }
             }
@@ -265,16 +265,16 @@ namespace netcore {
         users_[fd]->init(fd, addr); //初始化
         if( timeoutMS_ > 0) //加入 时间控制器里
             timer_->add(fd, timeoutMS_, [this, fd ,Conn = users_[fd].get()](){
-                        LOG_DEBUG("Timer_ Close connection, fd = %d",fd);
+                        LOG(DEBUG) << "Timer_ Close connection, fd = " << fd;
                         this->CloseConn_(Conn);
                     });
                     //std::bind(&http_server_::CloseConn_, this, users_[fd].get()));
             //timer_->add(fd, timeoutMS_, [this,fd](){
-                    //LOG_INFO("================ timer_ close");
+                    //LOG(INFO)("================ timer_ close");
                     //});
         epoller_->AddFd(fd, EPOLLIN | connEvent_); //加入epoller里的监听
         SetFdNonblock(fd); //设置无阻塞
-        LOG_INFO("Client[%d] in!", users_[fd]->GetFd());
+        LOG(INFO) << "Client[" << users_[fd]->GetFd() << "] in!";
     }
 
 //====================  epoll_server virtual
@@ -285,11 +285,11 @@ namespace netcore {
         do {
             //在listenFd_ 上创建监听
             int fd = accept(listenFd_, (struct sockaddr *)&addr, &len); 
-            LOG_DEBUG("new connection ,fd is %d",fd);
+            LOG(DEBUG) << "new connection ,fd : " << fd;
             if(fd <= 0) { return;}
             else if(HttpConn::userCount >= MAX_FD) {
                 SendError_(fd, "Server busy!");
-                LOG_WARN("Clients is full!");
+                LOG(WARNING) << "Clients is full!";
                 return;
             }
             AddClient_(fd, addr,

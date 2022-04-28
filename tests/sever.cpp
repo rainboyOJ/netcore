@@ -1,8 +1,10 @@
 #include <regex>
 #include "http_server.hpp"
-#include "websocket_manager.h"
+//#include "websocket_manager.h"
 
+__START_LOG__
 using namespace netcore;
+
 struct check_login {
     bool before(request& req,response& rep){
         //auto weak_session = req.get_session();
@@ -18,6 +20,19 @@ struct check_login {
 //创建一个全局的服务器
 netcore::http_server_ Server;
 int main(){
+#ifdef DEBUG
+    std::cout << "=====================1" << std::endl;
+#endif
+
+#ifndef DEBUG
+    std::cout << "=====================2" << std::endl;
+#endif
+
+    LOG(INFO) ;
+    LOG(DEBUG) ;
+    LOG(TRACE) ;
+    LOG(ERROR) ;
+
     Server.set_http_handler<GET>("/helloworld",[](request & req,response & res){
             res.set_status_and_content(status_type::ok,"hello world,this netcore Server",req_content_type::string);
     });

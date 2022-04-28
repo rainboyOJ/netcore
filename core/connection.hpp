@@ -10,12 +10,11 @@
 #include <stdlib.h>      // atoi()
 #include <errno.h>      
 
-#include "log.h"
+#include "define.h"
 
 #include "request.hpp" //请求
 #include "response.hpp" //响应
 #include "websocket.hpp" //websocket
-#include "define.h"
 #include "http_cache.hpp"
 #include "multipart_reader.hpp"
 #include "buffer.h"
@@ -182,7 +181,6 @@ namespace netcore {
             }else{
                 chunked_header_ = http_range_chunk_header + "Content-Type: " + std::string(mime.data(), mime.length()) + "\r\n\r\n";
             }
-            LOG_DEBUG("========= connection write_chunked_header == ");
             res_.response_str() = std::move(chunked_header_);
             req_.set_state(data_proc_state::data_continue); //设置data_continue 会读取req的
             //设置下一个任务
@@ -272,22 +270,18 @@ namespace netcore {
             //LOG_DEBUG("this pointer is %llx",static_cast<void *>(this));
             //int ret = req_.parse_header_expand_last_len(last_transfer_); //解析头
             int ret = req_.parse_header(len_); //解析头
-            LOG_INFO("handle_read, parse_size %d",ret);
             update_len_(last_transfer_); //已经处理的数据
-            LOG_DEBUG("METHOD: %.*s",req_.get_method().length(),req_.get_method().data())
-            LOG_DEBUG("URL: %.*s",req_.get_url().length(),req_.get_url().data())
 #ifdef DEBUG // 定义为调试模式
+            LOG(DEBUG) << "METHOD: " << req_.get_method();
+            LOG(DEBUG) << "URL: " << req_.get_url();
 
             //printf("parse_header  result begin ========================\n");
-            LOG_DEBUG("====== The request headers were : ======")
+            LOG(DEBUG) << "====== The request headers were : ======";
             auto [_headers_,_num_headers_] = req_.get_headers();
             for(int i = 0 ;i < _num_headers_;i++){
-                for(int j =0;j < _headers_[i].name_len;j++)
-                    LOG_DEBUG_NONEWLINE("%c",_headers_[i].name[j]);
-                LOG_DEBUG_NONEWLINE(" ");
-                for(int j =0;j < _headers_[i].value_len;j++)
-                    LOG_DEBUG_NONEWLINE("%c",_headers_[i].value[j]);
-                LOG_DEBUG_NONEWLINE("\n");
+                LOG(INFO) << std::string_view(_headers_[i].name,_headers_[i].name_len) 
+                    << ": "
+                    << std::string_view(_headers_[i].value,_headers_[i].value_len);
             }
             //printf("parse_header  result end ========================\n");
 #endif
@@ -298,11 +292,10 @@ namespace netcore {
                 return TO_EPOLL_WRITE; // 进入写入
             }
             if( !peek_route() ) { //找不到对应的路由
-                LOG_DEBUG("peek_route Failed" );
+                LOG(DEBUG) << "peek_route Failed" ;
                 return TO_EPOLL_WRITE;
             }
-            LOG_DEBUG("peek_route Success" );
-            
+
             check_keep_alive();
             if (ret == parse_status::not_complete) {
                 //do_read_head(); //继续读取 头
@@ -744,7 +737,7 @@ namespace netcore {
                 //part的开始 
                 //on_part_begin 其时在一个part在头解析结束时候的动作
                 multipart_parser_.on_part_begin = [this](const multipart_headers & headers) {
-                    LOG_DEBUG("=============== on_part_begin ");
+                    //LOG_DEBUG("=============== on_part_begin ");
                     req_.set_multipart_headers(headers); //加头 TODO 加到req_的哪里
                     auto filename = req_.get_multipart_field_name("filename");
                     is_multi_part_file_ = req_.is_multipart_file(); //是否是文件
@@ -755,7 +748,7 @@ namespace netcore {
                     }                        
                     if(is_multi_part_file_)
                     {
-                        LOG_DEBUG("is_multi_part_file_");
+                        LOG(DEBUG) << "is_multi_part_file_";
                         auto ext = get_extension(filename);
                         try {
                             auto tp = std::chrono::high_resolution_clock::now(); //弄时间 作为名字
@@ -767,7 +760,7 @@ namespace netcore {
                                 name = static_dir_ + "/" + name;
                             }
                             
-                            LOG_DEBUG("open_upload_file %s",name.c_str());
+                            LOG(DEBUG) << "open_upload_file : " << name;
                             req_.open_upload_file(name); //打开这个文件
                         }
                         catch (const std::exception& ex) {
@@ -782,7 +775,7 @@ namespace netcore {
                 };
                 //part的的数据
                 multipart_parser_.on_part_data = [this](const char* buf, size_t size) {
-                    LOG_DEBUG("=============== on_part_data ");
+                    //LOG_DEBUG("=============== on_part_data ");
                     if (req_.get_state() == data_proc_state::data_error) {
                         return;
                     }
@@ -795,7 +788,7 @@ namespace netcore {
                 };
                 //part的的结束
                 multipart_parser_.on_part_end = [this] { //这里是把文件保存下来
-                    LOG_INFO("=============== on_part_end ");
+                    //LOG_INFO("=============== on_part_end ");
                     if (req_.get_state() == data_proc_state::data_error)
                         return;
                     if(is_multi_part_file_)
@@ -805,7 +798,7 @@ namespace netcore {
                         if (pfile) {
                             auto old_name = pfile->get_file_path();
                             auto pos = old_name.rfind("_ing");
-                            LOG_INFO("old_name : %s",old_name.c_str());
+                            //LOG_INFO("old_name : %s",old_name.c_str());
                             if (pos != std::string::npos) {
                                 pfile->rename_file(old_name.substr(0, old_name.length() - 4)); //把_ing 去掉
                             }                            
@@ -826,7 +819,7 @@ namespace netcore {
          */
         //解析 multipart
         bool parse_multipart(size_t size, std::size_t length) {
-            LOG_DEBUG("Run parse_multipart size %d,length %d",size,length);
+            //LOG_DEBUG("Run parse_multipart size %d,length %d",size,length);
             if (length == 0)
                 return false;
 
@@ -841,7 +834,7 @@ namespace netcore {
             } while (fed < bufsize && !multipart_parser_.stopped());
 
             if (multipart_parser_.has_error()) {
-                LOG_DEBUG("multipart parser error message %s",multipart_parser_.get_error_message());
+                LOG(ERROR) <<  "multipart parser error message :" << multipart_parser_.get_error_message();
                 req_.set_state(data_proc_state::data_error);
                 return true;
             }
@@ -852,7 +845,7 @@ namespace netcore {
 
         //处理multipart
         bool handle_multipart() {
-            LOG_DEBUG("=====================handle_multipart=====================");
+            //LOG_DEBUG("=====================handle_multipart=====================");
             if (upload_check_) {
                 bool r = (*upload_check_)(req_, res_);
                 if (!r) {
@@ -865,13 +858,13 @@ namespace netcore {
             //LOG_DEBUG("req_ current_size %lld",req_.current_size());
             //LOG_DEBUG("req_ header_len %lld",req_.header_len());
             bool has_error = parse_multipart(req_.header_len(), req_.current_size() - req_.header_len());
-            LOG_DEBUG("has_error %d",has_error);
+            //LOG_DEBUG("has_error %d",has_error);
             if (has_error) {
                 response_back(status_type::bad_request, "mutipart error");
                 return TO_EPOLL_WRITE;
             }
 
-            LOG_DEBUG("req_.has_recieved_all_part() %d",req_.has_recieved_all_part());
+            //LOG_DEBUG("req_.has_recieved_all_part() %d",req_.has_recieved_all_part());
             if (req_.has_recieved_all_part()) { //接收完全部的数据,结束
                 call_back();
                 return TO_EPOLL_WRITE;
@@ -885,7 +878,7 @@ namespace netcore {
 
         //读multipart
         bool do_read_multipart() {
-            LOG_DEBUG("Run Function do_read_multipart");
+            //LOG_DEBUG("Run Function do_read_multipart");
             req_.fit_size();
             //auto self = this->shared_from_this();
             //if (ec) {
@@ -896,7 +889,7 @@ namespace netcore {
             //}
 
             bool has_error = parse_multipart(0, last_transfer_);
-            LOG_DEBUG("has_error %d",has_error);
+            //LOG_DEBUG("has_error %d",has_error);
 
             if (has_error) { //parse error
                 keep_alive_ = false;
@@ -1022,8 +1015,6 @@ namespace netcore {
             return TO_EPOLL_WRITE;
         }
 
-        bool handle_chunked_header() {
-        }
         //-------------chunked(read chunked not support yet, write chunked is ok)----------------------//
 
         bool handle_body() {
@@ -1089,8 +1080,8 @@ namespace netcore {
                 keep_alive_ = !req_conn_hdr.empty() && iequal(req_conn_hdr.data(), req_conn_hdr.size(), "keep-alive");
             }
 
-            LOG_DEBUG(" req_conn_hdr ",req_conn_hdr.data());
-            LOG_DEBUG("check_keep_alive : %d ",keep_alive_);
+            //LOG_DEBUG(" req_conn_hdr ",req_conn_hdr.data());
+            //LOG_DEBUG("check_keep_alive : %d ",keep_alive_);
 
             res_.set_keep_alive(keep_alive_);
 
@@ -1152,9 +1143,6 @@ namespace netcore {
             //});
         }
 
-        bool noasync_write(const char * buff_){ //写一些东西
-        }
-
         bool writing() const { return !buffer_seq_.empty(); } // buffer_seq_ 不空的时候是在写
 
         template<typename F1, typename F2>
@@ -1180,7 +1168,7 @@ public:
                 has_closed_ = false;
                 reset(); // 每一次都必须是一次完整的http请求
             }
-            LOG_INFO("Client[%d](%s:%d) in, userCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
+            //LOG_INFO("Client[%d](%s:%d) in, userCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
         //关闭
@@ -1195,7 +1183,7 @@ public:
             continue_work_ = nullptr;
             userCount--;
             ::close(fd_);
-            LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
+            //LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
         //核心 这里处理读取
@@ -1266,7 +1254,7 @@ private:
 
         inline int __read_all(int * saveErrno){ //读取所有能读取的数据
             int len = 0;
-            LOG_DEBUG("before Read, req_ buf current_size %d",req_.get_cur_size_());
+            //LOG_DEBUG("before Read, req_ buf current_size %d",req_.get_cur_size_());
             //一直读取,直到不能再读读取了位置
             do {
                 int siz = recv(fd_,req_.buffer(),req_.left_size(),0);
@@ -1283,8 +1271,8 @@ private:
                 //printf("%c",*i);
             //}
             //printf("read_char end ======================= \n\n");
-            LOG_INFO("__read_all read size %d",len);
-            LOG_DEBUG("after Read, req_ buf current_size %d",req_.get_cur_size_());
+            //LOG_INFO("__read_all read size %d",len);
+            //LOG_DEBUG("after Read, req_ buf current_size %d",req_.get_cur_size_());
             return len;
         }
 

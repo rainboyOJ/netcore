@@ -101,21 +101,14 @@ void epoll_server<HttpConn>::__init__(
     InitEventMode_(trigMode);
     if(!InitSocket_()) { isClose_ = true;}
     if(openLog) {
-#ifdef DEBUG
-        Log::Instance()->init_default();
-#else
-        Log::Instance()->init(logLevel, "./log", ".log", logQueSize);
-#endif
-        if(isClose_) { LOG_ERROR("========== Server init error!=========="); }
+        if(isClose_) { LOG(ERROR) << ("========== Server init error!=========="); }
         else {
-            LOG_INFO("========== Server init ==========");
-            LOG_INFO("Port:%d, OpenLinger: %s", port_, OptLinger? "true":"false");
-            LOG_INFO("Listen Mode: %s, OpenConn Mode: %s",
-                            (listenEvent_ & EPOLLET ? "ET": "LT"),
-                            (connEvent_ & EPOLLET ? "ET": "LT"));
-            LOG_INFO("LogSys level: %d", logLevel);
-            //LOG_INFO("srcDir: %s", HttpConn::srcDir);
-            //LOG_INFO("SqlConnPool num: %d, ThreadPool num: %d", connPoolNum, threadNum);
+            LOG(INFO) << ("========== Server init ==========");
+            LOG(INFO) << "Port:" <<  port << ", OpenLinger: " <<  (OptLinger ? "true":"false") ;
+            LOG(INFO) << "Listen Mode:" << (listenEvent_ & EPOLLET ? "ET": "LT") <<
+                  "OpenConn Mode:  " << (connEvent_ & EPOLLET ? "ET": "LT");
+            //LOG(INFO) << "srcDir: " <<  HttpConn::srcDir;
+            //LOG(INFO) << "SqlConnPool num: " << connPoolNum << ", ThreadPool num: %d", connPoolNum, threadNum);
         }
     }
 }
@@ -159,7 +152,7 @@ bool epoll_server<HttpConn>::InitSocket_() {
     int ret;
     struct sockaddr_in addr;
     if(port_ > 65535 || port_ < 1024) {
-        LOG_ERROR("Port:%d error!",  port_);
+        LOG(ERROR) <<  "Port: " << port_ <<  "error!";
         return false;
     }
     addr.sin_family = AF_INET;
@@ -174,14 +167,14 @@ bool epoll_server<HttpConn>::InitSocket_() {
 
     listenFd_ = socket(AF_INET, SOCK_STREAM, 0);
     if(listenFd_ < 0) {
-        LOG_ERROR("Create socket error!", port_);
+        LOG(ERROR) << "Create socket error" ;
         return false;
     }
 
     ret = setsockopt(listenFd_, SOL_SOCKET, SO_LINGER, &optLinger, sizeof(optLinger));
     if(ret < 0) {
         close(listenFd_);
-        LOG_ERROR("Init linger error!", port_);
+        LOG(ERROR) << "Init linger error!";
         return false;
     }
 
@@ -190,32 +183,32 @@ bool epoll_server<HttpConn>::InitSocket_() {
     /* 只有最后一个套接字会正常接收数据。 */
     ret = setsockopt(listenFd_, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
     if(ret == -1) {
-        LOG_ERROR("set socket setsockopt error !");
+        LOG(ERROR) << ("set socket setsockopt error !");
         close(listenFd_);
         return false;
     }
 
     ret = bind(listenFd_, (struct sockaddr *)&addr, sizeof(addr));
     if(ret < 0) {
-        LOG_ERROR("Bind Port:%d error!", port_);
+        LOG(ERROR) << "Bind Port:" << port_ << " error!";
         close(listenFd_);
         return false;
     }
 
     ret = listen(listenFd_, 6);
     if(ret < 0) {
-        LOG_ERROR("Listen port:%d error!", port_);
+        LOG(ERROR) << "Listen port:" << port_ << " error!";
         close(listenFd_);
         return false;
     }
     ret = epoller_->AddFd(listenFd_,  listenEvent_ | EPOLLIN);
     if(ret == 0) {
-        LOG_ERROR("Add listen error!");
+        LOG(ERROR) << ("Add listen error!");
         close(listenFd_);
         return false;
     }
     SetFdNonblock(listenFd_);
-    LOG_INFO("Server port:%d", port_);
+    LOG(INFO) << "Server port: " <<  port_;
     return true;
 }
 
@@ -225,7 +218,7 @@ void epoll_server<HttpConn>::SendError_(int fd, const char*info) {
     assert(fd > 0);
     int ret = send(fd, info, strlen(info), 0);
     if(ret < 0) {
-        LOG_WARN("send error to client[%d] error!", fd);
+        LOG(WARNING) << "send error to client["<< fd << "] error!";
     }
     close(fd);
 }
@@ -233,7 +226,7 @@ void epoll_server<HttpConn>::SendError_(int fd, const char*info) {
 template<typename HttpConn>
 void epoll_server<HttpConn>::CloseConn_(HttpConn* client) {
     //assert(client);
-    LOG_INFO("Client[%d] quit!", client->GetFd());
+    LOG(INFO) << "Client[" << client->GetFd() <<  "] quit!";
     epoller_->DelFd(client->GetFd());
     client->Close();
 }
@@ -305,10 +298,10 @@ void epoll_server<HttpConn>::OnProcess(HttpConn* client) {
         }
         // client->process返回true的时候表示已经读取完毕想要的数据
         // 转入 写的阶段,否则继续读取
-        LOG_DEBUG("After client->process() set server continue to write.");
+        LOG(DEBUG) << ("After client->process() set server continue to write.");
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLOUT);
     } else {
-        LOG_DEBUG("After client->process() set server continue to read.");
+        LOG(DEBUG) << ("After client->process() set server continue to read.");
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLIN);
     }
 }
@@ -324,13 +317,13 @@ void epoll_server<HttpConn>::OnWrite_(HttpConn* client) {
         // 主要看 connection 的process 是如果工作的
         if( client->has_continue_workd() ) { 
             /* 继续传输 */
-            LOG_DEBUG("client has_continue_workd,so process it");
+            LOG(DEBUG) << ("client has_continue_workd,so process it");
             OnProcess(client);
             return;
         }
         /* 传输完成 */
         //是否保持长连接?
-        LOG_DEBUG("trans ok IsKeepAlive %d",client->IsKeepAlive()); 
+        //LOG(DEBUG) << "trans ok IsKeepAlive  << ",client->IsKeepAlive()); 
         if(client->IsKeepAlive()) {
             OnProcess(client);
             return;

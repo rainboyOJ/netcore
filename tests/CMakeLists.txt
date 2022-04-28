@@ -7,6 +7,8 @@
 #include_directories(../lib)
 
 
+add_definitions(-DDEBUG)
+
 file(GLOB TESTS "*.cpp")
 foreach(f ${TESTS})
     string(REPLACE ".cpp" "" testname ${f})

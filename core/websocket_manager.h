@@ -34,7 +34,7 @@ public:
      * @brief 反注册
      * 在ws关闭的时候 反注册
      */
-    bool unregist(std::string id,int fd);
+    void unregist(std::string id,int fd);
     //是否存活,是否存在
     bool is_alive(std::string_view id);
 

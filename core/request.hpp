@@ -6,7 +6,6 @@
 #ifdef CINATRA_ENABLE_GZIP
 #include "gzip.hpp"
 #endif
-#include "log.h"
 #include "define.h"
 #include "upload_file.hpp"
 #include "url_encode_decode.hpp"
