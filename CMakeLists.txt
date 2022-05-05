@@ -6,22 +6,24 @@ project(netcore)
 
 # 指定编译flag
 set(CMAKE_CXX_FLAGS "-std=c++17")
+#if(${CMAKE_BUILD_TYPE} EQUAL "debug")
+if (CMAKE_BUILD_TYPE STREQUAL "debug")
+    #add_definitions("-g")
+    #SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
+    SET(CMAKE_CXX_FLAGS_DEBUG "-g")
+    # 设置宏
+    add_definitions(-DDEBUG)
+endif (CMAKE_BUILD_TYPE STREQUAL "debug")
 
-if(${CMAKE_BUILD_TYPE} EQUAL "debug")
-    add_definitions("-g")
-endif(${CMAKE_BUILD_TYPE} EQUAL "debug")
 
 
-
-# 设置宏
-add_definitions(-D DEBUG)
 
 
 #set(USER_CONFIG_PATH "${PROJECT_SOURCE_DIR}/__user_config.hpp")
 #message(STATUS "户的配置文件 ${USER_CONFIG_PATH}")
 if(EXISTS ${USER_CONFIG_PATH})
     message(STATUS "使用用户的配置文件 ${USER_CONFIG_PATH}")
-    add_definitions(-D USER_CONFIG)
+    add_definitions(-DUSER_CONFIG)
     add_compile_options(-include ${USER_CONFIG_PATH})
 else()
     message(STATUS "使用默认配置文件 ${PROJECT_SOURCE_DIR}/__default_config.hpp")
@@ -45,9 +47,10 @@ aux_source_directory(core/hs_utils HTTPSERVER_UTILS_SRC)
 # 并将名称保存到 DIR_SRCS 变量
 
 #add_executable(test ${DIR_SRCS})
-add_library(netcore STATIC ${DIR_SRCS} ${CORE_SRC} ${HTTPSERVER_UTILS_SRC})
+add_library(netcore STATIC ${DIR_SRCS} ${CORE_SRC} ${HTTPSERVER_UTILS_SRC} lib/easyloggingpp/easylogging++.cc)
 
 if( NOT DEFINED NOT_ADD_NETCORE_TESTS )
+    #include(tests/CMakeLists.txt)
     add_subdirectory(tests)
 endif(NOT DEFINED NOT_ADD_NETCORE_TESTS )
 

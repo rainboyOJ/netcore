@@ -28,3 +28,21 @@ set(USER_CONFIG_PATH "${PROJECT_SOURCE_DIR}/__user_config.hpp")
 - [Nomango/configor: Light weight configuration library for C++](https://github.com/Nomango/configor)
 - [redis/hiredis: Minimalistic C client for Redis >= 1.2](https://github.com/redis/hiredis)
 - [小白视角：一文读懂社长的TinyWebServer | HU](https://huixxi.github.io/2020/06/02/%E5%B0%8F%E7%99%BD%E8%A7%86%E8%A7%92%EF%BC%9A%E4%B8%80%E6%96%87%E8%AF%BB%E6%87%82%E7%A4%BE%E9%95%BF%E7%9A%84TinyWebServer/#more)
+
+
+
+```
+timer.hpp not use
+```
+
+## 功能
+
+- [ ] connect 抽象
+- [ ] 连接超时检测
+- [ ] 文件上传
+    - [ ] 尺寸限制
+    - [ ] multipart
+- [ ] 文件下载
+- [ ] 路由
+- [ ] websocket
+- [ ] 简易Cache
