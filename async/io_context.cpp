@@ -3,6 +3,26 @@
 namespace netcore {
 
 
+    std::string ioe2str(epoll_event& evt)
+    {
+        std::string str;
+        str += ((evt.events & EPOLLIN) ? "EPOLLIN " : "");;
+        str += ((evt.events & EPOLLPRI) ? "EPOLLPRI " : "");
+        str += ((evt.events & EPOLLOUT) ? "EPOLLOUT " : "");
+        str += ((evt.events & EPOLLRDNORM) ? "EPOLLRDNORM " : "");
+        str += ((evt.events & EPOLLRDBAND) ? "EPOLLRDBAND " : "");
+        str += ((evt.events & EPOLLWRBAND) ? "EPOLLWRBAND " : "");
+        str += ((evt.events & EPOLLMSG) ? "EPOLLMSG " : "");
+        str += ((evt.events & EPOLLERR) ? "EPOLLERR " : "");
+        str += ((evt.events & EPOLLHUP) ? "EPOLLHUP " : "");
+        str += ((evt.events & EPOLLRDHUP) ? "EPOLLRDHUP " : "");
+        str += ((evt.events & EPOLLEXCLUSIVE) ? "EPOLLEXCLUSIVE " : "");
+        str += ((evt.events & EPOLLWAKEUP) ? "EPOLLWAKEUP " : "");
+        str += ((evt.events & EPOLLONESHOT) ? "EPOLLONESHOT " : "");
+        str += ((evt.events & EPOLLET) ? "EPOLLET " : "");
+        return str;
+    }
+
     IoContext::IoContext(){
 
         auto fd = epoll_create1(EPOLL_CLOEXEC); //创建一个epoll
@@ -59,9 +79,11 @@ namespace netcore {
             //TINYASYNC_LOG("waiting event ... handle = %s", handle_c_str(epfd));
             int nfds = epoll_wait(m_epoll_handle, (epoll_event *)events, maxevents, timeout);
 
+            log( "epoll_wait nfds:",nfds);
             for (auto i = 0; i < nfds; ++i)
             {
                 auto &evt = events[i];
+                log("event fd",evt.data.fd," events: ",ioe2str(evt));
                 TINYASYNC_LOG("event %d of %d", i, nfds);
                 TINYASYNC_LOG("event = %x (%s)", evt.events, ioe2str(evt).c_str());
                 auto callback = (Callback *)evt.data.ptr;

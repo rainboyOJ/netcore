@@ -59,7 +59,8 @@ namespace netcore {
         }
 
         if (binderr == -1) {
-            throw_errno(format("can't bind socket, fd = %x", socket));
+            //throw_errno(format("can't bind socket, fd = %x", socket));
+            throw std::runtime_error(format("can't bind socket, fd = %x", socket));
         }
     }
 

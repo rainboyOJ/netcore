@@ -66,7 +66,7 @@ namespace netcore {
         return true;
     }
 
-    Connection AcceptorAwaiter::await_resume(){
+    Connection::CONN_PTR AcceptorAwaiter::await_resume(){
         auto acceptor = m_acceptor;
         //acceptor->m_awaiter_que.pop(); // TODO pop了两次?
         NativeSocket conn_sock = m_conn_socket;
@@ -81,7 +81,8 @@ namespace netcore {
                 
         //TINYASYNC_ASSERT(conn_sock != NULL_SOCKET);
         //return { *acceptor->m_ctx, conn_sock, false };
-        return {};
+        //return { acceptor->m_ctx, conn_sock};
+        return  std::make_unique<Connection>(acceptor->m_ctx,conn_sock);
     }
 
 

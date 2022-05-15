@@ -4,6 +4,8 @@
 
 namespace netcore {
 
+    std::string ioe2str(epoll_event& evt);
+
     class IoContext;
 
 

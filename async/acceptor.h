@@ -5,7 +5,7 @@
 #include "io_context.h"
 #include "task.h"
 #include "socketMixin.h"
-#include "Connection.h"
+#include "connection.h"
 
 namespace netcore {
 
@@ -18,10 +18,9 @@ namespace netcore {
     class AcceptorCallback : public CallbackImplBase { friend class Acceptor;
         Acceptor* m_acceptor;
     public:
-        AcceptorCallback(Acceptor* acceptor) : CallbackImplBase(this)
-        {
-            m_acceptor = acceptor;
-        };
+        AcceptorCallback(Acceptor* acceptor) 
+            : CallbackImplBase(this), m_acceptor { acceptor }
+        {}
 
         void on_callback(IoEvent& evt);
     };
@@ -54,7 +53,7 @@ namespace netcore {
          * 将 Acceptor的m_socket加入到epoll里监听,设置回调用函数
          */
         bool await_suspend(std::coroutine_handle<TaskPromise> h);
-        Connection await_resume();
+        Connection::CONN_PTR await_resume();
     };
 
     struct Acceptor :public SocketMixin {
