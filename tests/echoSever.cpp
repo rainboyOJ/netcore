@@ -12,7 +12,7 @@ Task handle_conn(Connection::CONN_PTR conn){
     log(__FILE__,__LINE__,"in handle_conn");
     try {
         for(;;) {
-            char buf[5];
+            char buf[200];
             std::cout << "await message ...." << std::endl;
             auto nread = co_await conn->async_read(buf, sizeof(buf)-1);
             if( nread == 0)
