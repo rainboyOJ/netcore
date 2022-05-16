@@ -27,6 +27,7 @@ namespace std {
 #endif
 
 #include <atomic>
+#include <cstring>
 #include <exception>
 #include <utility>
 #include <map>
@@ -65,6 +66,9 @@ namespace std {
 #include <sys/eventfd.h>
 #include <netinet/tcp.h>
 #include <pthread.h>
+
+
+#include "net_error.hpp"
 
 #define TINYASYNC_NODISCARD
 #define TINYASYNC_UNLIKELY

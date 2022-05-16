@@ -8,8 +8,6 @@ namespace netcore {
 
     class IoContext;
 
-
-
     class PostTask
     {
     friend IoContext;

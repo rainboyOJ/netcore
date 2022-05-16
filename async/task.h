@@ -12,8 +12,8 @@ struct TaskPromise {
     //std::coroutine_handle<void> m_continuation;
 
     std::coroutine_handle<TaskPromise> m_h;
+    std::exception_ptr m_except{nullptr};
 
-     
     std::coroutine_handle<TaskPromise>
     coroutine_handle() const
     {
@@ -30,14 +30,19 @@ struct TaskPromise {
         return {};
     }
 
-    std::suspend_always final_suspend() noexcept
+    //std::suspend_always final_suspend() noexcept
+    //{
+        //return {};
+    //}
+
+    std::suspend_never final_suspend() noexcept
     {
         return {};
     }
-
     void unhandled_exception() // TODO 如何处理异常呢?
     {
         //m_unhandled_exception.exception() = std::current_exception();
+        m_except = std::current_exception();
     }
     void return_void() {};
 };

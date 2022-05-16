@@ -101,6 +101,8 @@ namespace netcore {
             AsyncSendAwaiter * m_send_awaiter{nullptr};
             ConnCallBack m_callback{this};
 
+            std::exception_ptr m_except{nullptr}; //存异常
+
         public:
             using CONN_PTR = std::unique_ptr<Connection>;
             
@@ -124,7 +126,9 @@ namespace netcore {
             /**
              * !!注意 async_read和async_send 都不支持在多个同时在多个携程内调用
              */
+            // retvalue=0 表示连接断开了
             AsyncReadAwaiter async_read(char * buf,std::size_t buff_size);
+            // retvalue=0 表示连接断开了
             AsyncSendAwaiter async_send(char * buf,std::size_t buff_size);
             void close();
             //static void on_callback(IoEvent & evt);

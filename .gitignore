@@ -39,3 +39,4 @@ coredump.*
 www/
 build/
 trash/
+async/1

@@ -4,10 +4,15 @@
 #include "basic.hpp"
 #include "io_context.h"
 #include "task.h"
-#include "socketMixin.h"
+#include "protocol.h"
+//#include "socketMixin.h"
 #include "connection.h"
 
 namespace netcore {
+
+    void setnonblocking(NativeSocket fd);
+    void bind_socket(NativeSocket socket, Endpoint const& endpoint);
+    NativeSocket open_socket(Protocol const& protocol, bool blocking = false);
 
     struct Address;
     struct Endpoint;
@@ -56,15 +61,22 @@ namespace netcore {
         Connection::CONN_PTR await_resume();
     };
 
-    struct Acceptor :public SocketMixin {
+    struct Acceptor {
         private:
             friend class AcceptorAwaiter;
             friend class AcceptorCallback;
+            
+            IoContext * m_ctx;
+            Protocol     m_protocol;
+            Endpoint     m_endpoint;
+            NativeSocket m_socket;
+            bool m_added_to_event_pool;
+
             AcceptorCallback m_callback = this;
             Queue m_awaiter_que; //存awaiter的queue
         public:
-            Acceptor(): SocketMixin() {}
-            Acceptor(IoContext & ctx): SocketMixin(ctx) {}
+            Acceptor();
+            Acceptor(IoContext & ctx);
 
             Acceptor(IoContext& ctx, Protocol protocol, Endpoint endpoint);
             Acceptor(Protocol protocol, Endpoint endpoint);
@@ -77,6 +89,8 @@ namespace netcore {
             void listen();
             // 异步的接收连接
             AcceptorAwaiter async_accept();
+
+            void reset();
 
         private:
     };

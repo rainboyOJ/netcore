@@ -10,18 +10,24 @@ using namespace netcore;
 
 Task handle_conn(Connection::CONN_PTR conn){
     log(__FILE__,__LINE__,"in handle_conn");
-    for(;;) {
-        char buf[100];
-        std::cout << "await message ...." << std::endl;
-        auto nread = co_await conn->async_read(buf, 99);
-        if( nread == 0)
-            break;
+    try {
+        for(;;) {
+            char buf[5];
+            std::cout << "await message ...." << std::endl;
+            auto nread = co_await conn->async_read(buf, sizeof(buf)-1);
+            if( nread == 0)
+                break;
 
-        auto nwrite = co_await conn->async_send(buf, nread);
-        if( nwrite == 0)
-            break;
+            auto nwrite = co_await conn->async_send(buf, nread);
+            if( nwrite == 0)
+                break;
+        }
     }
-
+    catch(std::exception & e){
+        log("SOME ERORR HAPPEN.....");
+        log(e.what());
+    }
+    log("handle_conn exit");
 }
 
 Task listen(IoContext & ctx){

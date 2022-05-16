@@ -13,17 +13,19 @@ namespace netcore {
                     //读取成功
                     return recv_size;
                 else {
-                    log("errno may be disconnection");
-                    throw std::runtime_error("errno may be disconnection");
+                    log("recv errno");
+                    //throw std::runtime_error("errno may be disconnection");
+                    throw netcore::RecvError(std::strerror(errno));
                 }
             }
             else if( nbytes == 0) { //对就关闭连接
-                log("may be disconnection");
+                log("connection disconnection");
                 return 0;
             }
             recv_size += nbytes;
             if( recv_size >= buff_size) //没有空间了
-                throw std::runtime_error("buf not enough space");
+                throw netcore::RecvError("buffer not enough space");
+                //throw std::runtime_error("buf not enough space");
         }
     }
 
@@ -38,7 +40,8 @@ namespace netcore {
                     return sent;
                 }
                 else 
-                    throw "send error";
+                    throw netcore::SendError(std::strerror(errno));
+                    //throw "send error";
             }
             send_size -= nbytes;
             sent += nbytes;
@@ -67,15 +70,25 @@ namespace netcore {
             m_connection ->m_recv_at_awaiter = false;
             //读取一直读取完绊
             auto awaiter = recv_awaiter;
-            awaiter->m_tranfer_bytes = netcore::recv(m_connection->m_socket, awaiter->m_buff, awaiter->m_buff_size);
+            try {
+                awaiter->m_tranfer_bytes = netcore::recv(m_connection->m_socket, awaiter->m_buff, awaiter->m_buff_size);
+            }
+            catch(...) {
+                m_connection->m_except = std::current_exception();
+            }
             awaiter->m_h.resume();
         }
 
         if( (events & EPOLLOUT ) && send_awaiter != nullptr)
         {
             m_connection->m_send_at_awaiter = false;
-            long long nbytes  = netcore::send(m_connection->m_socket, send_awaiter->buf(), send_awaiter->left_buf_size());
-            send_awaiter->update_sent_size(nbytes);
+            try {
+                long long nbytes  = netcore::send(m_connection->m_socket, send_awaiter->buf(), send_awaiter->left_buf_size());
+                send_awaiter->update_sent_size(nbytes);
+            }
+            catch(...) {
+                m_connection->m_except = std::current_exception();
+            }
 
             if(send_awaiter->finised()) { //发送完毕
                 send_awaiter->m_h.resume();
@@ -85,11 +98,13 @@ namespace netcore {
             }
         }
 
+        /*
         if (events & ( EPOLLERR | EPOLLHUP) )  {
             // 关闭连接
             // 换起所有的awaiter
             m_connection->close();
         }
+        */
         
         //if( (events & (EPOLLOUT | EP)))
     }
@@ -101,7 +116,12 @@ namespace netcore {
         m_h = h;
         m_conn->m_read_awaiter = this;
         if(m_conn->m_recv_at_awaiter) {
-            this->m_tranfer_bytes = netcore::recv(m_conn->m_socket, this->m_buff, this->m_buff_size);
+            try {
+                this->m_tranfer_bytes = netcore::recv(m_conn->m_socket, this->m_buff, this->m_buff_size);
+            }
+            catch(...){
+                m_conn->m_except = std::current_exception();
+            }
             return false; //不会挂起
         }
         return true;
@@ -110,6 +130,9 @@ namespace netcore {
     std::size_t AsyncReadAwaiter::await_resume()
     {
         m_conn->m_read_awaiter = nullptr;
+        if( m_conn->m_except != nullptr) {
+            std::rethrow_exception(m_conn->m_except);
+        }
         return m_tranfer_bytes;
     }
     // === AsyncSendAwaiter
@@ -133,8 +156,13 @@ namespace netcore {
         m_h = h;
         m_conn->m_send_awaiter = this;
         if( m_conn -> m_send_at_awaiter ) {
-            long long nbytes  = netcore::send(m_conn->m_socket, this->buf(), this->left_buf_size());
-            this->update_sent_size(nbytes);
+            try {
+                long long nbytes  = netcore::send(m_conn->m_socket, this->buf(), this->left_buf_size());
+                this->update_sent_size(nbytes);
+            }
+            catch(...){
+                m_conn->m_except = std::current_exception();
+            }
             if(this->finised()) { //发送完毕
                 return false;
             }
@@ -145,6 +173,9 @@ namespace netcore {
     std::size_t AsyncSendAwaiter::await_resume()
     {
         m_conn->m_send_awaiter = nullptr;
+        if( m_conn->m_except != nullptr) {
+            std::rethrow_exception(m_conn->m_except);
+        }
         return m_tranfer_bytes;
     }
 
@@ -187,6 +218,7 @@ namespace netcore {
     }
 
     Connection::~Connection() {
+        log("Connection deconsructor");
         close();
     }
 
