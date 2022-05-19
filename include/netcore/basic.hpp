@@ -83,8 +83,10 @@ namespace std {
 namespace netcore {
 
 
+    static std::mutex mtx;
     template<typename... T>
     void log(T... args){
+        std::lock_guard<std::mutex> lck(mtx);
         ( (std::cout << args << " "),...);
         std::cout << '\n';
     }

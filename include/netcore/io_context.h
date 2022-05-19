@@ -45,6 +45,7 @@ namespace netcore {
 
     public:
         IoContext();
+        IoContext(NativeHandle epoll_fd); //使用其它 提供的epollfd
         ~IoContext();
         NativeHandle event_poll_handle() const;
         void post_task(PostTask * callback);

@@ -35,11 +35,11 @@ namespace netcore {
         log("event poll created", handle_c_str(m_epoll_handle));
 
 
-        fd = eventfd(1, EFD_NONBLOCK);
-        if (fd == -1)
-        {
-            throw("IoContext().IoContext(): can't create eventfd");
-        }
+        //fd = eventfd(1, EFD_NONBLOCK);
+        //if (fd == -1)
+        //{
+            //throw("IoContext().IoContext(): can't create eventfd");
+        //}
 
         //m_wakeup_handle = fd;
         //TINYASYNC_LOG("wakeup handle created %s", handle_c_str(m_wakeup_handle));
@@ -55,8 +55,15 @@ namespace netcore {
         //}
 
     }
+    IoContext::IoContext(NativeHandle epoll_fd)
+        :m_epoll_handle(epoll_fd)
+    {
+        log("m_epoll_handle",epoll_fd);
+        //log("event poll created", handle_c_str(m_epoll_handle));
+    }
 
     IoContext::~IoContext(){
+        log("===== ~IoContext");
         ::close(m_epoll_handle);
     }
 
@@ -79,7 +86,7 @@ namespace netcore {
             //TINYASYNC_LOG("waiting event ... handle = %s", handle_c_str(epfd));
             int nfds = epoll_wait(m_epoll_handle, (epoll_event *)events, maxevents, timeout);
 
-            log( "epoll_wait nfds:",nfds);
+            //log( "epoll_wait nfds:",nfds);
             for (auto i = 0; i < nfds; ++i)
             {
                 auto &evt = events[i];

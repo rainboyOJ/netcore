@@ -120,9 +120,12 @@ namespace netcore {
             auto epfd = m_acceptor->m_ctx->event_poll_handle();
             auto ctlerr = epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &evt);
             if (ctlerr == -1) {
-                TINYASYNC_LOG("can't await accept %s (epoll %s)", socket_c_str(listenfd), handle_c_str(epfd));
+                //log("can't await accept %s (epoll %s)", socket_c_str(listenfd), handle_c_str(epfd));
+                log("=====================add epoll ctl error,epoll_fd",std::to_string(epfd),"listenfd",std::to_string(listenfd));
                 //throw_errno(format("can't await accept %x (epoll %s)", socket_c_str(listenfd), handle_c_str(epfd)));
+                throw std::runtime_error("add epoll ctl error");
             }
+            log("listenfd",listenfd,"add epoll",std::to_string(epfd),"succ");
             m_acceptor->m_added_to_event_pool = true;
         }
         return true;
@@ -181,10 +184,36 @@ namespace netcore {
             //open(protocol); // 创建一个socket 给 m_socket
 
             m_socket = open_socket(protocol);
+            //
+            //
+            struct linger optLinger = { 0 };
+            /* 优雅关闭: 直到所剩数据发送完毕或超时 */
+            optLinger.l_onoff = 1;
+            optLinger.l_linger = 1;
+
+            int ret = setsockopt(m_socket, SOL_SOCKET, SO_LINGER, &optLinger, sizeof(optLinger));
+            if(ret == -1) {
+                //LOG(ERROR) << ("set socket setsockopt error !");
+                throw std::runtime_error("set socket setsockopt error !");
+                //close(listenFd_);
+                //return false;
+            }
+
+            int optval = 1;
+            ret = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
+            if(ret == -1) {
+                throw std::runtime_error("set socket setsockopt error !");
+                //LOG(ERROR) << ("set socket setsockopt error !");
+                //close(listenFd_);
+                //return false;
+            }
+
             m_protocol = protocol;
+
             bind_socket(m_socket,endpoint); 
             m_endpoint = endpoint;
             listen(); //进入监听
+            log("listenfd is ",m_socket);
         }
         catch(...){
             reset();

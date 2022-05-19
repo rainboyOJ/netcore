@@ -89,6 +89,8 @@ namespace netcore {
             void listen();
             // 异步的接收连接
             AcceptorAwaiter async_accept();
+            //同步的连接,不需要注册到ioConentx
+            NativeSocket accept();
 
             void reset();
 
