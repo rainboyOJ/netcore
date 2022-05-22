@@ -121,6 +121,8 @@ namespace netcore {
             Connection(Connection const &) = delete;
             void operator=(Connection const &) = delete;
 
+            void clear_except();
+
             ~Connection();
 
             /**

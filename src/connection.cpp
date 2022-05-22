@@ -32,21 +32,28 @@ namespace netcore {
     long long send(NativeHandle sock,char * buf,long long send_size){
         int nbytes = 0;
         long long sent = 0;
+        log("send func1");
         while( send_size  > 0) {
-            nbytes = ::send(sock, buf+sent, send_size, 0);
+            log("send func while,socket",sock);
+            nbytes = ::send(sock, buf+sent, send_size, MSG_NOSIGNAL);
+            log("send func ::send end");
             if( nbytes < 0 ) {
                 if( (errno == EAGAIN || errno == EWOULDBLOCK ) ) 
                 {
+                    log("send func2");
                     return sent;
                 }
-                else 
+                else {
+                    log("send func3");
                     throw netcore::SendError(std::strerror(errno));
+                }
                     //throw "send error";
             }
             send_size -= nbytes;
             sent += nbytes;
             //buf += nbytes;
         }
+                    log("send func4");
         return sent;
     }
 
@@ -65,10 +72,11 @@ namespace netcore {
         auto recv_awaiter = m_connection->m_read_awaiter;
         auto send_awaiter = m_connection->m_send_awaiter;
 
-        if( ( events & EPOLLIN ) && recv_awaiter !=nullptr )
+        if( ( events & EPOLLIN ) && m_connection !=nullptr )
         {
+            log("EVENt run RECV >>>>");
             m_connection ->m_recv_at_awaiter = false;
-            //读取一直读取完绊
+            //读取一直读取完毕
             auto awaiter = recv_awaiter;
             try {
                 awaiter->m_tranfer_bytes = netcore::recv(m_connection->m_socket, awaiter->m_buff, awaiter->m_buff_size);
@@ -79,14 +87,16 @@ namespace netcore {
             awaiter->m_h.resume();
         }
 
-        if( (events & EPOLLOUT ) && send_awaiter != nullptr)
+        if( (events & EPOLLOUT ) && m_connection->m_send_awaiter != nullptr)
         {
+            log("EVENt run send >>>>");
             m_connection->m_send_at_awaiter = false;
             try {
                 long long nbytes  = netcore::send(m_connection->m_socket, send_awaiter->buf(), send_awaiter->left_buf_size());
                 send_awaiter->update_sent_size(nbytes);
             }
             catch(...) {
+                log("connection send error");
                 m_connection->m_except = std::current_exception();
             }
 
@@ -115,15 +125,15 @@ namespace netcore {
     {
         m_h = h;
         m_conn->m_read_awaiter = this;
-        if(m_conn->m_recv_at_awaiter) {
-            try {
-                this->m_tranfer_bytes = netcore::recv(m_conn->m_socket, this->m_buff, this->m_buff_size);
-            }
-            catch(...){
-                m_conn->m_except = std::current_exception();
-            }
-            return false; //不会挂起
-        }
+        //if(m_conn->m_recv_at_awaiter) {
+            //try {
+                //this->m_tranfer_bytes = netcore::recv(m_conn->m_socket, this->m_buff, this->m_buff_size);
+            //}
+            //catch(...){
+                //m_conn->m_except = std::current_exception();
+            //}
+            //return false; //不会挂起
+        //}
         return true;
     }
 
@@ -156,14 +166,19 @@ namespace netcore {
         m_h = h;
         m_conn->m_send_awaiter = this;
         if( m_conn -> m_send_at_awaiter ) {
+            log("AsyncSendAwaiter await_suspend send");
             try {
                 long long nbytes  = netcore::send(m_conn->m_socket, this->buf(), this->left_buf_size());
                 this->update_sent_size(nbytes);
             }
             catch(...){
                 m_conn->m_except = std::current_exception();
+                log("catch error set m_conn m_except");
+                return false;
             }
+            log("send finshed");
             if(this->finised()) { //发送完毕
+                log("send finshed 2");
                 return false;
             }
         }
@@ -220,6 +235,9 @@ namespace netcore {
     Connection::~Connection() {
         log("Connection deconsructor");
         close();
+        if( m_except != nullptr) {
+            std::rethrow_exception(m_except);
+        }
     }
 
     void Connection::close() {
@@ -239,6 +257,11 @@ namespace netcore {
 
         if( m_socket !=-1)
             ::close(m_socket);
+    }
+
+    void Connection::clear_except()
+    {
+        this->m_except = nullptr;
     }
 
 

@@ -15,9 +15,9 @@ namespace netcore {
 
     NativeSocket open_socket(Protocol const& protocol, bool blocking)
     {
-#ifdef TINYASYNC_THROW_ON_OPEN
-        throw_error("throw on open", 0);
-#endif
+//#ifdef TINYASYNC_THROW_ON_OPEN
+        //throw_error("throw on open", 0);
+//#endif
         TINYASYNC_GUARD("open_socket(): ");
 
 
@@ -26,7 +26,7 @@ namespace netcore {
         // AF_INET 使用IPV4 版本,本程序暂时还没有支持IPV6
         auto socket_ = ::socket(AF_INET, SOCK_STREAM, 0);
         if (socket_ == -1) {
-            throw("can't create socket");
+            throw std::runtime_error("can't create socket");
         }
         if (!blocking)
             setnonblocking(socket_);
@@ -138,7 +138,7 @@ namespace netcore {
 
         if(conn_sock == -1) {
             //throw_errno(format("can't accept, socket = %s", socket_c_str(conn_sock)).c_str());
-            throw;
+            throw std::runtime_error("can't accept");
         }
 
         TINYASYNC_LOG("setnonblocking, socket = %s", socket_c_str(conn_sock));
@@ -234,7 +234,7 @@ namespace netcore {
                 auto ctlerr = epoll_ctl(m_ctx->event_poll_handle(), EPOLL_CTL_DEL, m_socket, NULL);
                 if (ctlerr == -1) {
                     auto what = format("can't remove (from epoll) socket %x", m_socket);
-                    throw(what);
+                    throw std::runtime_error(what);
                 }
                 m_added_to_event_pool = false;
             }

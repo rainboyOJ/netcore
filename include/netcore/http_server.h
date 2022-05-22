@@ -25,24 +25,10 @@ class Server {
         Server()  = delete;
         Server(int id,Acceptor & acc);
         Server(int id,NativeHandle epollfd,Acceptor & acc);
-        Task handle(Connection::CONN_PTR conn) {
-            for(;;) {
-                char buff[100];
-                auto nbtyes = co_await conn->async_read(buff,sizeof(buff)-1);
-                // 进行相应的处理
-                if( nbtyes == 0)
-                    break;
-                log("server :[",m_id,"]recv bytes:",nbtyes);
-                log("recv content:",std::string(buff));
-                //log("sleep 10...");
-                std::this_thread::sleep_for(std::chrono::seconds(3));
 
-                nbtyes = co_await conn->async_send(buff, nbtyes);
+        //处理发生connection
+        Task handle(Connection::CONN_PTR conn) ;
 
-                if( nbtyes == 0)
-                    break;
-            }
-        }
         Task listen() //启动
         {
             for(;;) {

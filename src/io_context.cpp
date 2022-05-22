@@ -29,7 +29,7 @@ namespace netcore {
         if (fd == -1)
         {
             //TODO better throw
-            throw("IoContext().IoContext(): can't create epoll");
+            throw std::runtime_error("IoContext().IoContext(): can't create epoll");
         }
         m_epoll_handle = fd;
         log("event poll created", handle_c_str(m_epoll_handle));
@@ -94,19 +94,20 @@ namespace netcore {
                 TINYASYNC_LOG("event %d of %d", i, nfds);
                 TINYASYNC_LOG("event = %x (%s)", evt.events, ioe2str(evt).c_str());
                 auto callback = (Callback *)evt.data.ptr;
-                if (callback >= CallbackGuard)
-                {
-                    TINYASYNC_LOG("invoke callback");
-                    try
-                    {
-                        callback->callback(evt);
-                    }
-                    catch (...)
-                    {
-                        //terminate_with_unhandled_exception();
-                        throw("error in IoContext run");
-                    }
-                }
+                log("invoke callback");
+                callback->callback(evt);
+                //if (callback >= CallbackGuard)
+                //{
+                    //TINYASYNC_LOG("invoke callback");
+                    //try
+                    //{
+                    //}
+                    //catch (...)
+                    //{
+                        ////terminate_with_unhandled_exception();
+                        //throw std::runtime_error("error in IoContext run");
+                    //}
+                //}
             }
 
         } // end for(;;)

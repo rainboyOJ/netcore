@@ -37,14 +37,23 @@ struct TaskPromise {
 
     std::suspend_never final_suspend() noexcept
     {
+        //if( m_except !=nullptr){
+            //std::rethrow_exception(m_except);
+        //}
         return {};
     }
     void unhandled_exception() // TODO 如何处理异常呢?
     {
         //m_unhandled_exception.exception() = std::current_exception();
+        log(">>>>>>>>unhandled_exception");
         m_except = std::current_exception();
+        std::rethrow_exception(m_except);
     }
-    void return_void() {};
+    void return_void() {
+        //if( m_except !=nullptr) {
+            //std::rethrow_exception(m_except);
+        //}
+    };
 };
 
 struct Task {
@@ -76,7 +85,13 @@ struct Task {
         {
             return m_h;
         }
-        void await_resume() {}
+        void await_resume() {
+            log("task await_resume");
+            if(m_h.promise().m_except !=nullptr ){
+                log("task await_resume catch error");
+                std::rethrow_exception(m_h.promise().m_except);
+            }
+        }
 };
 
 

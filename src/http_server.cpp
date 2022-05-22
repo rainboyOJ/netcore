@@ -2,6 +2,38 @@
 
 namespace netcore {
 
+    Task Server::handle(Connection::CONN_PTR conn) 
+    {
+        for(;;) {
+            char buff[100];
+            auto nbtyes = co_await conn->async_read(buff,sizeof(buff)-1);
+            // 进行相应的处理
+            if( nbtyes == 0)
+                break;
+            log("server :[",m_id,"]recv bytes:",nbtyes);
+            log("recv content:",std::string(buff));
+            //log("sleep 10...");
+            log("1,ready to send nbytes:",nbtyes);
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            log("2,ready to send nbytes:",nbtyes);
+
+            try {
+                nbtyes = co_await conn->async_send(buff, nbtyes);
+            }
+            catch(const netcore::SendError& e){
+                log("catch SendError at Server::handle");
+                conn->clear_except();
+                break;
+            }
+
+            if( nbtyes == 0){
+                log("======> send nbytes 0");
+                break;
+            }
+        }
+    }
+
+
     Server::Server(int id,Acceptor & acc)
         :m_id(id)
     {
@@ -18,15 +50,19 @@ namespace netcore {
     Server::Serve() {
         m_thread = std::thread([this]{
                 try {
-                    log("Server start id : ",m_id);
+                    log("$Server start id : $",m_id);
                     co_spawn(listen());
                     log("Server run at server id : ",m_id);
                     m_ctx.run();
                 }
-                catch(std::exception &e){
+                catch(const std::exception &e){
                     //log(std::current_exception());
+                    log("catch, error 1");
                     log(e.what());
                 }
+                //catch(...){
+                    //log("catch, error 2");
+                //}
             });
     }
 
