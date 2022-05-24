@@ -17,6 +17,7 @@
 #include "task.h"
 
 namespace netcore {
+    using namespace std::literals;
 
     long long recv(NativeSocket sock,char *buf,std::size_t buff_size);
     //发送数据,返回发送数据大小
@@ -38,21 +39,26 @@ namespace netcore {
 
 // ================ awaiter
     struct AsyncIoWaiterBases {
+        public:
+
         ListNode  m_node;
         Connection * m_conn{nullptr};
         std::size_t m_tranfer_bytes{0};
         char * m_buff;
         std::size_t m_buff_size;
         std::coroutine_handle<TaskPromise> m_h;
+        std::chrono::system_clock::time_point m_end_time;
+        PostTask * m_post_ptr;
 
-        AsyncIoWaiterBases(Connection * conn,char * buff,std::size_t buff_size) 
-            : m_conn{conn},m_buff{buff},m_buff_size{buff_size}
-        {}
+
+        AsyncIoWaiterBases(Connection * conn,char * buff,std::size_t buff_size,std::chrono::seconds time_);
 
         static AsyncIoWaiterBases *from_node(ListNode *node) {
             return (AsyncIoWaiterBases*)((char*)node - offsetof(AsyncIoWaiterBases, m_node));
         }
         bool await_ready() { return false; }
+
+        static void check_deley(PostTask * task_ptr);
 
         //template<class Promise>
         //inline void await_suspend(std::coroutine_handle<Promise> suspend_coroutine) {
@@ -60,11 +66,16 @@ namespace netcore {
             //await_suspend(h);
         //}
 
-        void unregister(NativeSocket conn_handle);
+        ~AsyncIoWaiterBases();
+
+        bool expired();
     };
 
     struct AsyncReadAwaiter :public AsyncIoWaiterBases {
-        using AsyncIoWaiterBases::AsyncIoWaiterBases;
+        //using AsyncIoWaiterBases::AsyncIoWaiterBases;
+
+        AsyncReadAwaiter(Connection * conn,char * buff,std::size_t buff_size,std::chrono::seconds time_) ;
+
         bool await_suspend(std::coroutine_handle<TaskPromise> h );
         std::size_t await_resume();
     };
@@ -84,12 +95,13 @@ namespace netcore {
 // ================ Connection
 
     class Connection {
+            friend AsyncIoWaiterBases;
             friend AsyncReadAwaiter;
             friend AsyncSendAwaiter;
             friend ConnCallBack;
         private:
             NativeSocket m_socket{-1};
-            IoContext * m_ctx{nullptr};
+            //IoContext * m_ctx{nullptr};
 
             //bool m_recv_shutdown = false;
             //bool m_send_shutdown = false;
@@ -104,6 +116,7 @@ namespace netcore {
             std::exception_ptr m_except{nullptr}; //存异常
 
         public:
+            IoContext * m_ctx{nullptr};
             using CONN_PTR = std::unique_ptr<Connection>;
             
             bool m_send_at_awaiter = false; // 是否需要在awaiter 里写
@@ -129,9 +142,9 @@ namespace netcore {
              * !!注意 async_read和async_send 都不支持在多个同时在多个携程内调用
              */
             // retvalue=0 表示连接断开了
-            AsyncReadAwaiter async_read(char * buf,std::size_t buff_size);
+            AsyncReadAwaiter async_read(char * buf,std::size_t buff_size,std::chrono::seconds time_ = 10s);
             // retvalue=0 表示连接断开了
-            AsyncSendAwaiter async_send(char * buf,std::size_t buff_size);
+            AsyncSendAwaiter async_send(char * buf,std::size_t buff_size,std::chrono::seconds time_ = 10s);
             void close();
             //static void on_callback(IoEvent & evt);
 

@@ -24,6 +24,10 @@ namespace netcore {
         using BaseError::BaseError;
     };
 
+    struct IoTimeOut : public BaseError {
+        using BaseError::BaseError;
+    };
+
 
 } // end namespace 
 

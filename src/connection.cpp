@@ -7,19 +7,16 @@ namespace netcore {
         std::size_t recv_size = 0;
         for( ;;) {
             int nbytes = ::recv(sock, buf+recv_size, buff_size-recv_size,0 );
-            log("nbytes",nbytes);
             if( nbytes < 0){
                 if( (errno == EAGAIN || errno == EWOULDBLOCK ) ) 
                     //读取成功
                     return recv_size;
                 else {
-                    log("recv errno");
                     //throw std::runtime_error("errno may be disconnection");
                     throw netcore::RecvError(std::strerror(errno));
                 }
             }
             else if( nbytes == 0) { //对就关闭连接
-                log("connection disconnection");
                 return 0;
             }
             recv_size += nbytes;
@@ -32,19 +29,14 @@ namespace netcore {
     long long send(NativeHandle sock,char * buf,long long send_size){
         int nbytes = 0;
         long long sent = 0;
-        log("send func1");
         while( send_size  > 0) {
-            log("send func while,socket",sock);
             nbytes = ::send(sock, buf+sent, send_size, MSG_NOSIGNAL);
-            log("send func ::send end");
             if( nbytes < 0 ) {
                 if( (errno == EAGAIN || errno == EWOULDBLOCK ) ) 
                 {
-                    log("send func2");
                     return sent;
                 }
                 else {
-                    log("send func3");
                     throw netcore::SendError(std::strerror(errno));
                 }
                     //throw "send error";
@@ -53,7 +45,6 @@ namespace netcore {
             sent += nbytes;
             //buf += nbytes;
         }
-                    log("send func4");
         return sent;
     }
 
@@ -120,6 +111,57 @@ namespace netcore {
     }
 
 // Awaiter
+    AsyncIoWaiterBases::AsyncIoWaiterBases(Connection * conn,char * buff,std::size_t buff_size,std::chrono::seconds time_) 
+        : m_conn{conn},m_buff{buff},m_buff_size{buff_size}
+    {
+        m_end_time = std::chrono::system_clock::now() + time_;
+        //创建一个全局的PostTask
+        m_post_ptr = new PostTask;
+        m_post_ptr->set_callback(check_deley);
+        m_post_ptr->set_ref_count(1);
+        m_post_ptr->set_awaiter_ptr(&m_node);
+        //加入队列中
+        m_conn->m_ctx->post_task(m_post_ptr);
+    }
+
+    AsyncIoWaiterBases::~AsyncIoWaiterBases() {
+        m_post_ptr->set_ref_count(0); //表示运行结束
+    }
+
+    void AsyncIoWaiterBases::check_deley(PostTask *task_ptr)
+    {
+        // ref_count 是否为0
+        if(task_ptr->invalid()) {
+            delete task_ptr; //删除自己
+        }
+        else { //check time
+            //从PostTask 找到awaiter
+            auto await_ptr = from_node(task_ptr->get_m_awater_ptr());
+            //是否超时
+            if( await_ptr->expired() ) {
+                //throw 
+                await_ptr->m_conn->m_except = std::make_exception_ptr(netcore::IoTimeOut("connection AsyncIoWaiterBases TimeOut")); //创建exception_ptr
+                //执行唤醒
+                await_ptr->m_h.resume();
+            }
+            else {
+                //把task再次加入队列
+                await_ptr->m_conn->m_ctx->post_task(task_ptr);
+                log("add",task_ptr,"to ctx queue");
+            }
+        }
+    }
+
+    bool AsyncIoWaiterBases::expired() {
+        return  std::chrono::system_clock::now() > m_end_time;
+    }
+
+    AsyncReadAwaiter::AsyncReadAwaiter(Connection * conn,char * buff,std::size_t buff_size,std::chrono::seconds time_) 
+            :AsyncIoWaiterBases(conn,buff,buff_size,time_)
+        {
+            //加入任务
+            //m_conn->m_ctx->post_task(PostTask *callback)
+        }
 
     bool AsyncReadAwaiter::await_suspend(std::coroutine_handle<TaskPromise> h)
     {
@@ -202,7 +244,7 @@ namespace netcore {
         //evt.events = EPOLLONESHOT;
         //evt.events = EPOLLIN | EPOLLOUT;
         evt.events = EPOLLIN | EPOLLOUT | EPOLLEXCLUSIVE | EPOLLET;
-        evt.data.fd = m_socket;
+        //evt.data.fd = m_socket;
         evt.data.ptr = &m_callback;
 
         int _add_poll_ctl;
@@ -222,14 +264,14 @@ namespace netcore {
     void Connection::unRegisterToIoCtx() {
     }
 
-    AsyncReadAwaiter Connection::async_read(char *buf, std::size_t buff_size)
+    AsyncReadAwaiter Connection::async_read(char *buf, std::size_t buff_size,std::chrono::seconds time_)
     {
-        return {this,buf,buff_size};
+        return {this,buf,buff_size,time_};
     }
 
-    AsyncSendAwaiter Connection::async_send(char *buf, std::size_t buff_size)
+    AsyncSendAwaiter Connection::async_send(char *buf, std::size_t buff_size,std::chrono::seconds time_)
     {
-        return {this,buf,buff_size};
+        return {this,buf,buff_size,time_};
     }
 
     Connection::~Connection() {

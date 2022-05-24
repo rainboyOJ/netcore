@@ -23,6 +23,46 @@ namespace netcore {
         return str;
     }
 
+//======PostTask
+    void PostTask::set_callback(callback_type ptr) {
+        m_callback = ptr;
+    }
+    PostTask::callback_type PostTask::get_callback() {
+        return m_callback;
+    }
+
+    void PostTask::call(){
+        if(m_callback !=nullptr) {
+            m_callback(this);
+        }
+    }
+
+    void PostTask::set_ref_count_ptr(int * _count)  { m_ref_count = _count; }
+    void PostTask::set_awaiter_ptr(ListNode * node) { m_awaiter_ptr = node; }
+    int  PostTask::get_ref_count() const            { return *m_ref_count; }
+
+    bool PostTask::invalid() { return m_callback == nullptr || m_ref_count == nullptr || *m_ref_count <= 0; }
+
+    void PostTask::set_ref_count(int count){
+        if( m_ref_count !=nullptr)
+            *m_ref_count = count;
+        else
+            m_ref_count = new int(count);
+    }
+
+    PostTask::~PostTask() {
+        if( *m_ref_count <= 1) 
+            delete m_ref_count;
+        else
+            --*m_ref_count;
+    }
+
+    ListNode * PostTask::get_m_awater_ptr() const {
+        return m_awaiter_ptr;
+    }
+
+//======IoContext
+
     IoContext::IoContext(){
 
         auto fd = epoll_create1(EPOLL_CLOEXEC); //创建一个epoll
@@ -79,9 +119,40 @@ namespace netcore {
     void IoContext::run() {
         Callback *const CallbackGuard = (Callback *)8;
         for(;;) {
+            // ===== 进行 注册任务的检查
+            //遍历任务
+            log(">>>>> check m_task_queue ");
+            ListNode * end = m_task_queue.m_tail;
+            ListNode * node_ptr  = m_task_queue.pop();
+
+            for( ; node_ptr != end ; node_ptr = m_task_queue.pop() ){
+                //转成
+                log("node_ptr",node_ptr,"end",end);
+                auto post_task = from_node_to_post_task(node_ptr);
+                try  {
+                    //post_task->get_callback()(post_task);
+                    post_task->call(); //执行
+                }
+                catch(...){
+                    log("catch io_context post_task error!");
+                }
+            }
+            if( end !=nullptr) {
+                log("call end ptr:",end);
+                try  {
+                    auto post_task = from_node_to_post_task(end);
+                    post_task->call(); //执行
+                }
+                catch(...){
+                    log("catch io_context post_task error!");
+                }
+            }
+
+
+            // ===== 进行epoll event的检查
             const int maxevents = 5;
             epoll_event events[maxevents];
-            int const timeout = -1; // indefinitely
+            int const timeout = 0; // indefinitely
 
             //TINYASYNC_LOG("waiting event ... handle = %s", handle_c_str(epfd));
             int nfds = epoll_wait(m_epoll_handle, (epoll_event *)events, maxevents, timeout);

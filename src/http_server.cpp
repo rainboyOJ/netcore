@@ -5,32 +5,44 @@ namespace netcore {
     Task Server::handle(Connection::CONN_PTR conn) 
     {
         for(;;) {
-            char buff[100];
-            auto nbtyes = co_await conn->async_read(buff,sizeof(buff)-1);
-            // 进行相应的处理
-            if( nbtyes == 0)
-                break;
-            log("server :[",m_id,"]recv bytes:",nbtyes);
-            log("recv content:",std::string(buff));
-            //log("sleep 10...");
-            log("1,ready to send nbytes:",nbtyes);
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            log("2,ready to send nbytes:",nbtyes);
-
             try {
+                char buff[100];
+                auto nbtyes = co_await conn->async_read(buff,sizeof(buff)-1,3s);
+                // 进行相应的处理
+                if( nbtyes == 0)
+                    break;
+                log("server :[",m_id,"]recv bytes:",nbtyes);
+                log("recv content:",std::string(buff));
+                //log("sleep 10...");
+                log("1,ready to send nbytes:",nbtyes);
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                log("2,ready to send nbytes:",nbtyes);
+
                 nbtyes = co_await conn->async_send(buff, nbtyes);
+
+                if( nbtyes == 0){
+                    log("======> send nbytes 0");
+                    break;
+                }
+
             }
             catch(const netcore::SendError& e){
-                log("catch SendError at Server::handle");
+                log(e.what());
                 conn->clear_except();
                 break;
             }
-
-            if( nbtyes == 0){
-                log("======> send nbytes 0");
+            catch(const netcore::RecvError& e){
+                log(e.what());
+                conn->clear_except();
                 break;
             }
-        }
+            catch(const netcore::IoTimeOut& e){
+                log(e.what());
+                conn->clear_except();
+                break;
+            }
+            
+        } // end for(;;)
     }
 
 
