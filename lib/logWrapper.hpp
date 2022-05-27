@@ -23,46 +23,20 @@ private:
 
         el::Configurations defaultConf;
         defaultConf.setToDefault();
-#ifdef DEBUG
+#ifdef __NETCORE__DEBUG__
+        //颜色
         el::Loggers::addFlag(el::LoggingFlag::ColoredTerminalOutput);
         //不需要输出到 文件
         defaultConf.setGlobally(el::ConfigurationType::ToFile, "false");
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-        std::cout << "=====================1" << std::endl;
-//#else
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
-        std::cout << "=====================2" << std::endl;
+#else
         //不需要输出到 terminal
-        //defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,  "false");
+        defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,  "false");
         defaultConf.setGlobally(el::ConfigurationType::MaxLogFileSize,    "2097152"); // 2mb
         defaultConf.setGlobally(el::ConfigurationType::LogFlushThreshold, "100"); // 2mb{
         //关闭不需要的LOG
-        //defaultConf.set(el::Level::Info,  el::ConfigurationType::Enabled, "false");
-        //defaultConf.set(el::Level::Trace, el::ConfigurationType::Enabled, "false");
-        //defaultConf.set(el::Level::Debug, el::ConfigurationType::Enabled, "false");
+        defaultConf.set(el::Level::Info,  el::ConfigurationType::Enabled, "false");
+        defaultConf.set(el::Level::Trace, el::ConfigurationType::Enabled, "false");
+        defaultConf.set(el::Level::Debug, el::ConfigurationType::Enabled, "false");
 #endif
         el::Loggers::reconfigureLogger("default", defaultConf);
     }

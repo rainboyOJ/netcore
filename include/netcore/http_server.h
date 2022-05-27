@@ -4,6 +4,7 @@
 
 #include <thread>
 #include "core.h"
+#include "logWrapper.hpp"
 
 namespace netcore {
 

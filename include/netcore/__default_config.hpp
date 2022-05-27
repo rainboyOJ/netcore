@@ -30,13 +30,10 @@ struct __config__{
     static constexpr bool OptLinger      = true; //优雅的关闭socket
     static constexpr int sqlPort         = 3306;
     static constexpr const char* sqlUser = "root";
-    static constexpr const  char* sqlPwd = "root";
+    static constexpr const char* sqlPwd = "root";
     static constexpr const char* dbName  = "netcore";
     static constexpr int connPoolNum     = 4;
     static constexpr int threadNum       = 4;
-    static constexpr bool openLog        = true;
-    static constexpr int logLevel        = 0;
-    static constexpr int logQueSize      = 1;
 
     //其它配置
     static constexpr std::size_t maxRequestSize = 20_MB;

@@ -1,7 +1,7 @@
 clang++
--std=c++2a
+-std=c++20
 -fcoroutines-ts
 -stdlib=libc++
 -std=c++20
 -I./lib
--I./core
+-I./include/netcore
