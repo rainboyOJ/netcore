@@ -3,12 +3,7 @@
 #pragma once
 
 #include <thread>
-
-
-#include "io_context.h"
-#include "acceptor.h"
-#include "connection.h"
-
+#include "core.h"
 
 namespace netcore {
 
