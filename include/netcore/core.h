@@ -108,7 +108,7 @@ public:
     ListNode * get_m_awater_ptr() const ;
 
 private:
-    int * m_ref_count {nullptr};
+    int m_ref_count {0};
     friend class IoCtxBase;
     // use internally
     ListNode m_node;

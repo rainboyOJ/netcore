@@ -84,28 +84,19 @@ namespace netcore {
         }
     }
 
-    void PostTask::set_ref_count_ptr(int * _count)  { m_ref_count = _count; }
     void PostTask::set_awaiter_ptr(ListNode * node) { m_awaiter_ptr = node; }
-    int  PostTask::get_ref_count() const            { return *m_ref_count; }
+    int  PostTask::get_ref_count() const            { return m_ref_count; }
 
     bool PostTask::invalid() { 
-        return m_callback == nullptr || m_ref_count == nullptr || *m_ref_count <= 1; 
+        return m_callback == nullptr || m_ref_count <= 0; 
     }
 
     //TODO 这个接口不对,不应该手动的控制 count
     void PostTask::set_ref_count(int count){
-        if( m_ref_count !=nullptr)
-            *m_ref_count = count;
-        else
-            m_ref_count = new int(count);
+        m_ref_count = count;
     }
 
-    PostTask::~PostTask() {
-        if( *m_ref_count <= 1) 
-            delete m_ref_count;
-        else
-            --*m_ref_count;
-    }
+    PostTask::~PostTask() {}
 
     ListNode * PostTask::get_m_awater_ptr() const {
         return m_awaiter_ptr;
@@ -171,7 +162,7 @@ namespace netcore {
         for(;;) {
             // ===== 进行 注册任务的检查
             //遍历任务
-            log(">>>>> check m_task_queue ");
+            //log(">>>>> check m_task_queue ");
             ListNode * end = m_task_queue.m_tail;
             ListNode * node_ptr  = m_task_queue.pop();
 
@@ -666,21 +657,21 @@ namespace netcore {
         //创建一个全局的PostTask
         m_post_ptr = new PostTask;
         m_post_ptr->set_callback(check_deley);
-        m_post_ptr->set_ref_count(1);
+        m_post_ptr->set_ref_count(1); //设置1表示这个awaiter还存在
         m_post_ptr->set_awaiter_ptr(&m_node);
         //加入队列中
         m_conn->m_ctx->post_task(m_post_ptr);
     }
 
     AsyncIoWaiterBases::~AsyncIoWaiterBases() {
-        m_post_ptr->set_ref_count(0); //表示运行结束
+        m_post_ptr->set_ref_count(0); //表示awaiter不存在了
     }
 
     void AsyncIoWaiterBases::check_deley(PostTask *task_ptr)
     {
         // ref_count 是否为0
         if(task_ptr->invalid()) {
-            delete task_ptr; //删除自己
+            delete task_ptr; //删除task
         }
         else { //check time
             //从PostTask 找到awaiter
