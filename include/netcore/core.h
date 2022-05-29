@@ -5,6 +5,7 @@
 
 #pragma once
 #include "basic.hpp"
+#include "define.h"
 
 namespace netcore {
 

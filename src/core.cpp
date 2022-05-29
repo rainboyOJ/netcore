@@ -31,7 +31,7 @@ namespace netcore {
 
 
     void Task::await_resume() {
-        log("task await_resume");
+        LOG(INFO)  << "task await_resume";
     }
 
 //==========SpawnTask
@@ -113,7 +113,8 @@ namespace netcore {
             throw std::runtime_error("IoContext().IoContext(): can't create epoll");
         }
         m_epoll_handle = fd;
-        log("event poll created", handle_c_str(m_epoll_handle));
+        LOG(INFO) << "event poll created : " <<handle_c_str(m_epoll_handle);
+
 
 
         //fd = eventfd(1, EFD_NONBLOCK);
@@ -139,12 +140,12 @@ namespace netcore {
     IoContext::IoContext(NativeHandle epoll_fd)
         :m_epoll_handle(epoll_fd)
     {
-        log("m_epoll_handle",epoll_fd);
+        //log("m_epoll_handle",epoll_fd);
         //log("event poll created", handle_c_str(m_epoll_handle));
     }
 
     IoContext::~IoContext(){
-        log("===== ~IoContext");
+        //log("===== ~IoContext");
         ::close(m_epoll_handle);
     }
 
@@ -168,24 +169,23 @@ namespace netcore {
 
             for( ; node_ptr != end ; node_ptr = m_task_queue.pop() ){
                 //转成
-                log("node_ptr",node_ptr,"end",end);
                 auto post_task = from_node_to_post_task(node_ptr);
                 try  {
                     //post_task->get_callback()(post_task);
                     post_task->call(); //执行
                 }
                 catch(...){
-                    log("catch io_context post_task error!");
+                    LOG(ERROR) << "catch io_context post_task error!";
                 }
             }
             if( end !=nullptr) {
-                log("call end ptr:",end);
+                //log("call end ptr:",end);
                 try  {
                     auto post_task = from_node_to_post_task(end);
                     post_task->call(); //执行
                 }
                 catch(...){
-                    log("catch io_context post_task error!");
+                    LOG(ERROR) << "catch io_context post_task error!";
                 }
             }
 
@@ -202,11 +202,9 @@ namespace netcore {
             for (auto i = 0; i < nfds; ++i)
             {
                 auto &evt = events[i];
-                log("event fd",evt.data.fd," events: ",ioe2str(evt));
-                TINYASYNC_LOG("event %d of %d", i, nfds);
-                TINYASYNC_LOG("event = %x (%s)", evt.events, ioe2str(evt).c_str());
+                LOG(INFO) << "event fd:[" <<  evt.data.fd << "],events: " << ioe2str(evt);
                 auto callback = (Callback *)evt.data.ptr;
-                log("invoke callback");
+                //log("invoke callback");
                 callback->callback(evt);
                 //if (callback >= CallbackGuard)
                 //{
@@ -299,14 +297,11 @@ namespace netcore {
         }
         if (!blocking)
             setnonblocking(socket_);
-        TINYASYNC_LOG("create socket %s, nonblocking = %d", socket_c_str(socket_), int(!blocking));
         return socket_;
     }
 
     void bind_socket(NativeSocket socket, Endpoint const& endpoint)
     {
-        TINYASYNC_GUARD("bind_socket(): ");
-        TINYASYNC_LOG("socket = %s", socket_c_str(socket));
 
         int binderr;
         if(endpoint.address().m_address_type == AddressType::IpV4)
@@ -351,7 +346,7 @@ namespace netcore {
                     // wakeup awaiter
                 }
             }
-            log("acceptor connection",conn_sock);
+            LOG(INFO) <<  "acceptor connection : " <<  conn_sock;
             AcceptorAwaiter *awaiter = AcceptorAwaiter::from_node(node);
             awaiter->m_conn_socket = conn_sock;
             //TINYASYNC_RESUME(awaiter->m_suspend_coroutine);
@@ -359,7 +354,7 @@ namespace netcore {
         } else {
             // this will happen when after accetor.listen() but not yet co_await acceptor.async_accept()
             // you should have been using level triger to get this event the next time
-            TINYASYNC_LOG("No awaiter found, event ignored");
+            LOG(INFO) << "No awaiter found, event ignored";
         }
     }
 
@@ -390,11 +385,11 @@ namespace netcore {
             auto ctlerr = epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &evt);
             if (ctlerr == -1) {
                 //log("can't await accept %s (epoll %s)", socket_c_str(listenfd), handle_c_str(epfd));
-                log("=====================add epoll ctl error,epoll_fd",std::to_string(epfd),"listenfd",std::to_string(listenfd));
+                //log("=====================add epoll ctl error,epoll_fd",std::to_string(epfd),"listenfd",std::to_string(listenfd));
                 //throw_errno(format("can't await accept %x (epoll %s)", socket_c_str(listenfd), handle_c_str(epfd)));
                 throw std::runtime_error("add epoll ctl error");
             }
-            log("listenfd",listenfd,"add epoll",std::to_string(epfd),"succ");
+            //log("listenfd",listenfd,"add epoll",std::to_string(epfd),"succ");
             m_acceptor->m_added_to_event_pool = true;
         }
         return true;
@@ -482,7 +477,7 @@ namespace netcore {
             bind_socket(m_socket,endpoint); 
             m_endpoint = endpoint;
             listen(); //进入监听
-            log("listenfd is ",m_socket);
+            //log("listenfd is ",m_socket);
         }
         catch(...){
             reset();
@@ -507,7 +502,6 @@ namespace netcore {
                 }
                 m_added_to_event_pool = false;
             }
-            TINYASYNC_LOG("close socket = %s", socket_c_str(m_socket));
             if(close_socket(m_socket) < 0) {
                 printf("%d\n", errno);
                 std::exit(1);
@@ -529,7 +523,7 @@ namespace netcore {
     {
         int max_pendding_connection = 5;// TODO change this
         int err = ::listen(m_socket, max_pendding_connection);
-        log("listen at ",m_endpoint.port());
+        LOG(INFO) << "listen at " << m_endpoint.port();
         if (err == -1) {
             throw std::runtime_error("can't listen socket");
         }
@@ -542,7 +536,7 @@ namespace netcore {
 
 //========== Connection
     long long recv(NativeSocket sock,char *buf,std::size_t buff_size){
-        log("recv....");
+        //log("recv....");
         std::size_t recv_size = 0;
         for( ;;) {
             int nbytes = ::recv(sock, buf+recv_size, buff_size-recv_size,0 );
@@ -604,7 +598,7 @@ namespace netcore {
 
         if( ( events & EPOLLIN ) && m_connection !=nullptr )
         {
-            log("EVENt run RECV >>>>");
+            //log("EVENt run RECV >>>>");
             m_connection ->m_recv_at_awaiter = false;
             //读取一直读取完毕
             auto awaiter = recv_awaiter;
@@ -619,14 +613,12 @@ namespace netcore {
 
         if( (events & EPOLLOUT ) && m_connection->m_send_awaiter != nullptr)
         {
-            log("EVENt run send >>>>");
             m_connection->m_send_at_awaiter = false;
             try {
                 long long nbytes  = netcore::send(m_connection->m_socket, send_awaiter->buf(), send_awaiter->left_buf_size());
                 send_awaiter->update_sent_size(nbytes);
             }
             catch(...) {
-                log("connection send error");
                 m_connection->m_except = std::current_exception();
             }
 
@@ -686,7 +678,7 @@ namespace netcore {
             else {
                 //把task再次加入队列
                 await_ptr->m_conn->m_ctx->post_task(task_ptr);
-                log("add",task_ptr,"to ctx queue");
+                //log("add",task_ptr,"to ctx queue");
             }
         }
     }
@@ -747,19 +739,17 @@ namespace netcore {
         m_h = h;
         m_conn->m_send_awaiter = this;
         if( m_conn -> m_send_at_awaiter ) {
-            log("AsyncSendAwaiter await_suspend send");
+            //log("AsyncSendAwaiter await_suspend send");
             try {
                 long long nbytes  = netcore::send(m_conn->m_socket, this->buf(), this->left_buf_size());
                 this->update_sent_size(nbytes);
             }
             catch(...){
                 m_conn->m_except = std::current_exception();
-                log("catch error set m_conn m_except");
+                //log("catch error set m_conn m_except");
                 return false;
             }
-            log("send finshed");
             if(this->finised()) { //发送完毕
-                log("send finshed 2");
                 return false;
             }
         }
@@ -796,7 +786,6 @@ namespace netcore {
         }
         int ctlerr = epoll_ctl(m_ctx->event_poll_handle(), _add_poll_ctl, m_socket, &evt);
         //TODO Error
-        log("add socket to epoll , socket",m_socket);
 
     }
 
@@ -814,7 +803,7 @@ namespace netcore {
     }
 
     Connection::~Connection() {
-        log("Connection deconsructor");
+        LOG(INFO) << ("Connection deconsructor");
         close();
         if( m_except != nullptr) {
             std::rethrow_exception(m_except);
@@ -822,7 +811,7 @@ namespace netcore {
     }
 
     void Connection::close() {
-        log("connection close");
+        LOG(INFO) << ("connection close");
         this->m_recv_at_awaiter = false;
         this->m_send_at_awaiter = false;
 

@@ -28,6 +28,7 @@ private:
         el::Loggers::addFlag(el::LoggingFlag::ColoredTerminalOutput);
         //不需要输出到 文件
         defaultConf.setGlobally(el::ConfigurationType::ToFile, "false");
+        //defaultConf.set(el::Level::Debug,el::ConfigurationType::Format,"[%datetime][%level]: %msg");
 #else
         //不需要输出到 terminal
         defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,  "false");
