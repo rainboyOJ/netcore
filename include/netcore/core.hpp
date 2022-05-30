@@ -11,31 +11,74 @@ namespace netcore {
 using namespace std::chrono_literals;
 
 struct Task;
-struct SpawnTask;
-struct SpawnTaskPromise;
 
+//============SpawnTask 
+
+struct SpawnTask
+{
+
+    struct SpawnTaskPromise {
+        std::suspend_never initial_suspend() { return {}; }
+        std::suspend_never final_suspend() noexcept { 
+            //std::cout << "spawnTask promise destroy" << std::endl;
+            return {}; 
+        }
+        void unhandled_exception() {}
+
+        SpawnTask get_return_object() {
+            m_h  =  std::coroutine_handle<SpawnTaskPromise>::from_promise(*this);
+            return {m_h};
+            //return {std::coroutine_handle<SpawnTaskPromise>::from_promise(*this)};
+
+        }
+        std::coroutine_handle<SpawnTaskPromise> m_h;
+
+        void return_void() { }
+    };
+
+    using promise_type = SpawnTaskPromise;
+    using handle_type = std::coroutine_handle<>;
+
+    SpawnTask(handle_type h) : m_handle(h)
+    {}
+
+    handle_type m_handle;
+};
+
+
+//============SpawnTask 
 
 struct Task {
     public:
+        int id{0};
         struct TaskPromise {
             using handle_type = std::coroutine_handle<TaskPromise>;
             handle_type m_h;
+            SpawnTask::handle_type m_countinue;
+
             TaskPromise() = default;
             TaskPromise(TaskPromise const & ) = delete;
             TaskPromise(TaskPromise && ) = delete;
+
             Task get_return_object(){
+                this->m_countinue = std::noop_coroutine();
                 m_h = std::coroutine_handle<TaskPromise>::from_promise(*this);
                 return { m_h };
             }
 
             std::suspend_always initial_suspend() { return {}; }
-            std::suspend_never  final_suspend() noexcept { return {}; }
+            std::suspend_always  final_suspend() noexcept { 
+                if( m_countinue )
+                    m_countinue.resume();
+                return {}; 
+            }
 
             void unhandled_exception() { 
                 std::rethrow_exception(std::current_exception()); 
             }
 
             void return_void() {};
+
             handle_type coroutine_handle() const { return m_h; }
         };
         using promise_type = TaskPromise;
@@ -48,6 +91,20 @@ struct Task {
 
         Task(coroutine_handle_type h) :m_h{h}
         {}
+        Task(Task const &t )
+            : m_h {t.m_h}
+        {
+            id = t.id-1;
+        }
+
+        ~Task() {
+            //std::cout << "~Task id : " << id << std::endl;
+            //if( m_h )
+                //m_h.destroy();
+        }
+        void clear_coro_handle(){
+            m_h = {};
+        }
 
         coroutine_handle_type coroutine_handle() {
             return m_h;
@@ -60,46 +117,29 @@ struct Task {
         //awaitable
         bool await_ready() noexcept { return false; }
 
-        template<typename Promise>
-        auto await_suspend(std::coroutine_handle<Promise> awaiting_coro)
+        //如果await_suspend返回一个coroutine_handle,会handle 执行 reseume,然后挂起自己
+        //template<typename Promise>
+        auto await_suspend(SpawnTask::handle_type awaiting_coro)
             ->coroutine_handle_type
         {
+            m_h.promise().m_countinue = awaiting_coro;
+            //std::cout << "tast await_suspend" << std::endl;
             return m_h;
         }
 
         void await_resume() {
-            LOG(INFO)  << "task await_resume";
+            //LOG(INFO)  << "task await_resume";
         }
-};
-
-//============SpawnTask 
-
-struct SpawnTask
-{
-
-    struct SpawnTaskPromise {
-        std::suspend_never initial_suspend() { return {}; }
-        std::suspend_never final_suspend() noexcept { return {}; }
-        void unhandled_exception() {}
-
-        SpawnTask get_return_object() {
-            return {std::coroutine_handle<SpawnTaskPromise>::from_promise(*this)};
-        }
-
-        void return_void() { }
-    };
-
-    using promise_type = SpawnTaskPromise;
-
-    SpawnTask(std::coroutine_handle<> h) : m_handle(h)
-    {}
-
-    std::coroutine_handle<> m_handle;
+        
 };
 
 inline SpawnTask co_spawn(Task task) {
-    co_await task;
+    //std::cout << "co_spawn start" << std::endl;
+    co_await task; //TODO ? 那么 会不会这个task 执行完呢?
+    if( task.coroutine_handle() )
+        task.coroutine_handle().destroy();
 }
+
 
 //========== IoContext
 inline std::string ioe2str(epoll_event& evt) {
