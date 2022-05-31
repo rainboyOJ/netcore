@@ -754,7 +754,6 @@ public:
         friend AsyncSendAwaiter<RawConnection>;
         friend ConnCallBack;
 
-
     private:
         NativeSocket m_socket{-1};
         //IoContext * m_ctx{nullptr};
@@ -764,6 +763,8 @@ public:
         AsyncReadAwaiter<RawConnection> * m_read_awaiter{nullptr};
         AsyncSendAwaiter<RawConnection> * m_send_awaiter{nullptr};
         ConnCallBack m_callback{this};
+        
+        Address m_client_addr; //地址
 
         std::exception_ptr m_except{nullptr}; //存异常
 
@@ -776,6 +777,12 @@ public:
 
         RawConnection(IoContext * _ctx ,NativeHandle socket_fd)
             :m_ctx{_ctx},m_socket{socket_fd}
+        {
+            registerToIoCtx();
+        }
+
+        RawConnection(IoContext * _ctx ,NativeHandle socket_fd,uint32_t ip_v4_addr)
+            :m_ctx{_ctx},m_socket{socket_fd},m_client_addr{ip_v4_addr}
         {
             registerToIoCtx();
         }
@@ -794,6 +801,12 @@ public:
             if( m_except != nullptr) {
                 std::rethrow_exception(m_except);
             }
+        }
+
+        NativeSocket socket() const { return m_socket; }
+
+        std::string client_addr() const {
+            return m_client_addr.to_string();
         }
 
         /**
@@ -861,6 +874,7 @@ struct AcceptorAwaiter {
     ListNode  m_node;
     Acceptor* m_acceptor;
     NativeSocket m_conn_socket;
+    uint32_t m_u32_clien_addr{0};
     std::coroutine_handle<Task::TaskPromise> m_suspend_coroutine;
 
 public:
@@ -951,7 +965,9 @@ struct Acceptor {
                 ListNode* node = acceptor->m_awaiter_que.pop();
                 if (node) {
                     // it's ready to accept
-                    auto conn_sock = ::accept(acceptor->m_socket, NULL, NULL);
+                    struct sockaddr client_addr;
+                    socklen_t addrlen;
+                    auto conn_sock = ::accept(acceptor->m_socket, &client_addr, &addrlen);
                     if (conn_sock == -1) {
                         if(errno == EAGAIN || errno == EWOULDBLOCK) {
                             return;                    
@@ -960,9 +976,16 @@ struct Acceptor {
                             // wakeup awaiter
                         }
                     }
+
+                    //ip_v4
+                    struct sockaddr_in *s = (struct sockaddr_in *)&client_addr;
+                    //TODO ip_v6
+
+
                     LOG(INFO) <<  "acceptor connection : " <<  conn_sock;
                     AcceptorAwaiter<Acceptor> * awaiter = AcceptorAwaiter<Acceptor>::from_node(node);
                     awaiter->m_conn_socket = conn_sock;
+                    awaiter->m_u32_clien_addr = s->sin_addr.s_addr;
                     //TINYASYNC_RESUME(awaiter->m_suspend_coroutine);
                     awaiter->m_suspend_coroutine.resume();
                 } else {
