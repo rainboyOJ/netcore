@@ -119,6 +119,7 @@ namespace netcore {
         }
 
         //转成buffers TODO 这个函数要改
+        //TODO 改成一个 从memory pool 中申请
         std::vector<std::string> to_buffers() {
             std::vector<std::string> buffers;
             add_header("Host", "netcore");

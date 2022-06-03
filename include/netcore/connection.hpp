@@ -17,11 +17,11 @@
 #include "websocket.hpp" //websocket
 #include "http_cache.hpp"
 #include "multipart_reader.hpp"
-#include "buffer.h"
+//#include "buffer.h"
 #include "websocket_manager.h"
 
-#define TO_EPOLL_WRITE  true
-#define TO_EPOLL_READ  false
+#include "core.hpp"
+
 namespace netcore {
 
     using http_handler        = std::function<void(request&, response&)>;
@@ -31,41 +31,15 @@ namespace netcore {
     using send_failed_handler = std::function<void(const int&)>;
     using upload_check_handler= std::function<bool(request& req, response& res)>;
 
-    class base_connection {
-    public:
-        virtual ~base_connection() {}
+
+    enum class process_state {
+        need_read,
+        need_write,
+        need_ws
     };
-
-    class HttpConn :public base_connection {
-    public:
-        // 初始化
-        virtual void init(int sockFd, const sockaddr_in& addr) = 0;
-        virtual ssize_t read(int* saveErrno) =0;        //读取数据
-        virtual ssize_t write(int* saveErrno)=0;        //写入数据
-        virtual void Close() =0;                        //关闭连接
-        int GetFd() const { return fd_;}
-        int GetPort() const { return addr_.sin_port; }
-        const char* GetIP() const{ return inet_ntoa(addr_.sin_addr); }
-        sockaddr_in GetAddr() const{ return addr_; }
-        virtual bool process() = 0;                     //对数据进行处理
-        virtual int ToWriteBytes() = 0;
-
-        virtual bool IsKeepAlive() const = 0;// TODO 
-
-        //bool isET{true};
-        //static const char* srcDir;
-        static std::atomic<int> userCount; // 统计有少个用户连接
-
-        virtual ~HttpConn() override {}
-
-    protected:
-        int fd_;
-        struct  sockaddr_in addr_;
-    };
-
 
     using SocketType = int;
-    class connection : public HttpConn,private noncopyable ,public std::enable_shared_from_this<connection>
+    class connection : private noncopyable , public std::enable_shared_from_this<connection>
     {
     public:
         explicit connection(
@@ -75,53 +49,43 @@ namespace netcore {
                 http_handler_check * handler_check, // http_handler_check 的函数指针
                 ws_connection_check * ws_conn_check,
                 std::string& static_dir,    //静态资源目录
-                upload_check_handler * upload_check //上传查询
+                upload_check_handler * upload_check, //上传查询
+                NativeSocket fd_
             )
             :
             MAX_REQ_SIZE_(max_req_size), KEEP_ALIVE_TIMEOUT_(keep_alive_timeout),
             http_handler_(handler), http_handler_check_(handler_check),
             ws_connection_check_(ws_conn_check),
-            req_(res_), static_dir_(static_dir), upload_check_(upload_check)
+            req_(res_), static_dir_(static_dir), upload_check_(upload_check),
+            fd_{fd_}
         {
             init_multipart_parser(); //初始化 multipart 解析器
         }
 
 
-        auto& socket() {
-            return fd_;
+        int GetFd() const { return fd_;}
+
+        auto & req() {
+            return req_;
+        }
+        auto & res() {
+            return res_;
         }
 
-        std::string local_address() { //本地地址
+        //本地地址
+        std::string local_address() const { 
             if (has_closed_) {
                 return "";
             }
-
             //std::stringstream ss;
             return "unknown"; // TODO fix
-        }
-
-        std::string remote_address() { //远程地址
-            if (has_closed_) {
-                return "";
-            }
-            return "unknown"; // TODO fix
-        }
-
-        std::pair<std::string, std::string> remote_ip_port() { //远程ip port``
-            std::string remote_addr = remote_address();
-            if (remote_addr.empty())
-                return {};
-
-            size_t pos = remote_addr.find(':');
-            std::string ip = remote_addr.substr(0, pos);
-            std::string port = remote_addr.substr(pos + 1);
-            return {std::move(ip), std::move(port)};
         }
 
         const std::string& static_dir() {
             return static_dir_;
         }
 
+        //在发生错误的时间返回错误信息
         void on_error(status_type status, std::string&& reason) {
             keep_alive_ = false;
             req_.set_state(data_proc_state::data_error);
@@ -135,12 +99,16 @@ namespace netcore {
             Close();
         }
 
-        void set_tag(std::any&& tag) { // TODO tag 有什么用？
-            tag_ = std::move(tag);
-        }
+        process_state process() {
+            if (req_.at_capacity()) {  //超过最大容量
+                response_back(status_type::bad_request, "The request is too long, limitation is 3M"); //TODO 3M
+                return process_state::need_write;
+            }
 
-        auto& get_tag() {
-            return tag_;
+            if( !has_continue_workd() )
+                return handle_read(last_transfer_);
+            else
+                return (this->*continue_work_)();
         }
 
         //============ web socket ============
@@ -172,8 +140,9 @@ namespace netcore {
             auto header = websocket::format_header(msg.length(), op);
             send_msg(std::move(header), std::move(msg));
         }
-        //============ web socket ============
+        //============ web socket end ============
 
+        //============ file send ============
         void write_chunked_header(std::string_view mime,bool is_range=false) {
             req_.set_http_type(content_type::chunked); //设置内容为 chunked
             if(!is_range){
@@ -217,24 +186,22 @@ namespace netcore {
             }
         }
 
-        void response_now() {
-            do_write();
-        }
-
         //设置处理函数
         void set_multipart_begin(std::function<void(request&, std::string&)> begin) {
             multipart_begin_ = std::move(begin);
         }
 
+        // ?
         void set_validate(size_t max_header_len, check_header_cb check_headers) {
             req_.set_validate(max_header_len, std::move(check_headers));
         }
 
+        // ?
         void enable_response_time(bool enable) {
             res_.enable_response_time(enable);
         }
 
-        bool has_close() {
+        bool has_close() const {
             return has_closed_;
         }
 
@@ -242,36 +209,26 @@ namespace netcore {
             return res_;
         }
 
-        virtual ~connection() override {
+        ~connection() {
             Close();
         }
-    private:
-        // TODO del
-        void do_read() {
-            //if(isFirstRead){
-                //reset(); // 要不要reset 呢,第一次读取时需要，其它时间不需要
-                //isFirstRead = false;
-            //}
-            ////async_read_some();
-        }
 
+    private:
         void reset() {
             last_transfer_ = 0;
-            len_ = 0;
             req_.reset();
             res_.reset();
         }
 
 
         //core 处理读取的数据
-        bool handle_read(std::size_t bytes_transferred) { 
+        process_state handle_read(std::size_t bytes_transferred) { 
             //auto last_len = req_.current_size();
             //last_transfer_ = last_len;
             //LOG_DEBUG("this pointer is %llx",static_cast<void *>(this));
             //int ret = req_.parse_header_expand_last_len(last_transfer_); //解析头
-            int ret = req_.parse_header(len_); //解析头
-            update_len_(last_transfer_); //已经处理的数据
-#ifdef DEBUG // 定义为调试模式
+            int ret = req_.parse_header(0); //解析头
+#ifdef __NETCORE__DEBUG__
             LOG(DEBUG) << "METHOD: " << req_.get_method();
             LOG(DEBUG) << "URL: " << req_.get_url();
 
@@ -289,30 +246,20 @@ namespace netcore {
 
             if (ret == parse_status::has_error) { 
                 response_back(status_type::bad_request);
-                return TO_EPOLL_WRITE; // 进入写入
+                return process_state::need_write; // 进入写入
             }
             if( !peek_route() ) { //找不到对应的路由
                 LOG(DEBUG) << "peek_route Failed" ;
-                return TO_EPOLL_WRITE;
+                //TODO 404
+                //response_back(status_type::404notfoudn); // 改写res为404响应
+                return process_state::need_write;
             }
 
             check_keep_alive();
             if (ret == parse_status::not_complete) {
-                //do_read_head(); //继续读取 头
-                return TO_EPOLL_READ; //继续读取
+                return process_state::need_read;
             }
             else {
-                auto total_len = req_.total_len();
-                if (bytes_transferred > total_len + 4) { //TODO ? 这个基本不会运行 或者说运行的时机我还不知道
-                    std::string_view str(req_.data()+ len_+ total_len, 4);
-                    if (str == "GET " || str == "POST") {
-                        handle_pipeline(total_len, bytes_transferred); // TODO ?
-                        return true;
-                    }
-                } //                if (req_.get_method() == "GET"&&http_cache::get().need_cache(req_.get_url())&&!http_cache::get().not_cache(req_.get_url())) {
-//                    handle_cache();
-//                    return;
-//                }
                 return handle_request(bytes_transferred);
             }
         }
@@ -320,7 +267,7 @@ namespace netcore {
         //核心 
         // 处理和各种类型的body
         // 如果没有 body 直接 处理头
-        bool handle_request(std::size_t bytes_transferred) { //处理请求
+        process_state handle_request(std::size_t bytes_transferred) { //处理请求
             if (req_.has_body()) {
                 // TODO check call back is having this route
                 // {
@@ -330,199 +277,32 @@ namespace netcore {
                 auto type = get_content_type();
                 req_.set_http_type(type);
                 switch (type) {
-                case netcore::content_type::string:
-                case netcore::content_type::json:
-                case netcore::content_type::unknown:
-                    return handle_string_body(bytes_transferred);
-                case netcore::content_type::multipart:
-                    return handle_multipart();
-                case netcore::content_type::octet_stream:
-                    handle_octet_stream(bytes_transferred);
-                    break;
-                case netcore::content_type::urlencoded:
-                    handle_form_urlencoded(bytes_transferred);
-                    break;
-                case netcore::content_type::chunked:
-                    handle_chunked(bytes_transferred);
-                    break;
+                    case netcore::content_type::string:
+                    case netcore::content_type::json:
+                    case netcore::content_type::unknown:
+                        return handle_string_body(bytes_transferred);
+                    case netcore::content_type::multipart:
+                        return handle_multipart();
+                    case netcore::content_type::octet_stream:
+                        //handle_octet_stream(bytes_transferred);
+                        //response_back(status_type status)
+                        // 补全
+                        return process_state::need_write;
+                    case netcore::content_type::urlencoded:
+                        handle_form_urlencoded(bytes_transferred);
+                        break;
+                    case netcore::content_type::chunked:
+                        handle_chunked(bytes_transferred);
+                        break;
+                    case netcore::content_type::websocket:
+                        //TODO 对ws 应该如何处理 
+                        //是不是应该返回错误
+                        break;
                 }
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
             else {
                 return handle_header_request();
-            }
-        }
-
-        // cache
-        void handle_cache() {
-            auto raw_url = req_.raw_url();
-            if (!http_cache::get().empty()) {
-                auto resp_vec = http_cache::get().get(std::string(raw_url.data(), raw_url.length()));
-                if (!resp_vec.empty()) {
-                    std::vector<boost::asio::const_buffer> buffers;
-                    for (auto& iter : resp_vec) {
-                        //buffers.emplace_back(boost::asio::buffer(iter.data(), iter.size()));
-                        async_write(iter);
-                    }
-                    handle_write(0);
-                    // TODO async_write
-                    //boost::asio::async_write(socket(), buffers,
-                        //[self = this->shared_from_this(), resp_vec = std::move(resp_vec)](const int& ec, std::size_t bytes_transferred) {
-                        //self->handle_write(ec);
-                    //});
-                }
-            }
-        }
-
-        // TODO ?
-        // ret
-        // bytes_transferred
-        void handle_pipeline(size_t ret, std::size_t bytes_transferred) {
-            res_.set_delay(true);
-            req_.set_last_len(len_);
-            handle_request(bytes_transferred);
-            last_transfer_ += bytes_transferred;
-            if (len_ == 0)  //len_ 表示总体长度 ？
-                len_ = ret;
-            else
-                len_ += ret;
-            
-            auto& rep_str = res_.response_str();
-            int result = 0;
-            size_t left = ret;
-            bool head_not_complete = false;
-            bool body_not_complete = false;
-            size_t left_body_len = 0;
-            //int index = 1;
-            while (true) {
-                result = req_.parse_header(len_); //解析头
-                if (result == -1) {
-                    return;
-                }
-
-                if (result == -2) {     //还没有解析完
-                    head_not_complete = true;
-                    break;
-                }
-                
-                //index++;
-                auto total_len = req_.total_len();
-
-                if (total_len <= (bytes_transferred - len_)) {
-                    req_.set_last_len(len_);
-                    handle_request(bytes_transferred);
-                }                
-
-                len_ += total_len;
-
-                if (len_ == last_transfer_) {
-                    break;
-                }
-                else if (len_ > last_transfer_) {
-                    auto n = len_ - last_transfer_;
-                    len_ -= total_len;
-                    if (n<req_.header_len()) {
-                        head_not_complete = true;
-                    }
-                    else {
-                        body_not_complete = true;
-                        left_body_len = n;
-                    }
-
-                    break;
-                }
-            }
-
-            res_.set_delay(false);
-            //TODO async_write
-            //boost::asio::async_write(socket(), boost::asio::buffer(rep_str.data(), rep_str.size()),
-                //[head_not_complete, body_not_complete, left_body_len, this,
-                //self = this->shared_from_this(), &rep_str](const int& ec, std::size_t bytes_transferred) {
-                //rep_str.clear();
-                //if (head_not_complete) {
-                    //do_read_head();
-                    //return;
-                //}
-
-                //if (body_not_complete) {
-                    //req_.set_left_body_size(left_body_len);
-                    //do_read_body();
-                    //return;
-                //}
-
-                //handle_write(ec);
-            //});
-        }
-
-        //读取头
-        void do_read_head() {
-            int bytes_transferred =  __read_some(req_.buffer(), req_.left_size());
-            handle_read(bytes_transferred);
-            //socket().async_read_some(boost::asio::buffer(req_.buffer(), req_.left_size()),
-                //[this, self = this->shared_from_this()](const int& e, std::size_t bytes_transferred) {
-            //});
-        }
-
-        //读取body
-        void do_read_body() {
-            auto self = this->shared_from_this();
-            // TODO do read_some
-            //boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), req_.left_body_len()),
-                //[this, self](const int& ec, size_t bytes_transferred) {
-                //if (ec) {
-                    ////LOG_WARN << ec.message();
-                    //close();
-                    //return;
-                //}
-
-                //req_.update_size(bytes_transferred);
-                //req_.reduce_left_body_size(bytes_transferred);
-
-                //if (req_.body_finished()) {
-                    //handle_body();
-                //}
-                //else {
-                    //do_read_body();
-                //}
-            //});
-        }
-
-        //写 回应
-        void do_write() {
-            
-            std::string& rep_str = res_.response_str();
-            if (rep_str.empty()) {
-                //handle_write(int{});
-                return;
-            }
-            Writen(rep_str.data(), rep_str.size());
-
-            //cache
-//            if (req_.get_method() == "GET"&&http_cache::get().need_cache(req_.get_url()) && !http_cache::get().not_cache(req_.get_url())) {
-//                auto raw_url = req_.raw_url();
-//                http_cache::get().add(std::string(raw_url.data(), raw_url.length()), res_.raw_content());
-//            }
-            
-            //TODO async_write
-            //boost::asio::async_write(socket(), boost::asio::buffer(rep_str.data(), rep_str.size()),
-                //[this, self = this->shared_from_this()](const int& ec, std::size_t bytes_transferred) {
-                //handle_write(ec);
-            //});
-
-        }
-
-        void handle_write(const int& ec) {
-            if (ec) {
-                return;
-            }
-
-            if (keep_alive_) {
-                do_read();
-            }
-            else {
-                reset();
-                shutdown();
-                Close();
             }
         }
 
@@ -563,16 +343,16 @@ namespace netcore {
         }
 
         /****************** begin handle http body data *****************/
-        bool handle_string_body(std::size_t bytes_transferred) {
+        process_state handle_string_body(std::size_t bytes_transferred) {
             //defalt add limitation for string_body and else. you can remove the limitation for very big string.
             if (req_.at_capacity()) {
                 response_back(status_type::bad_request, "The request is too long, limitation is 3M");
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             if (req_.has_recieved_all()) {
                 handle_body();
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
             else {
                 req_.expand_size();
@@ -580,80 +360,12 @@ namespace netcore {
                 size_t part_size = req_.current_size() - req_.header_len();
                 if (part_size == -1) {
                     response_back(status_type::internal_server_error);
-                    return TO_EPOLL_WRITE;
+                    return process_state::need_write;
                 }
                 req_.reduce_left_body_size(part_size);
-                do_read_body();
-                return TO_EPOLL_READ;
+                return process_state::need_read;
             }
         }
-
-        //-------------octet-stream----------------//
-        void handle_octet_stream(size_t bytes_transferred) {
-            //call_back();
-            try {
-                auto tp = std::chrono::high_resolution_clock::now();
-                auto nano = tp.time_since_epoch().count();
-                std::string name = static_dir_ + "/" + std::to_string(nano);
-                req_.open_upload_file(name);
-            }
-            catch (const std::exception& ex) {
-                response_back(status_type::internal_server_error, ex.what());
-                return;
-            }
-
-            req_.set_state(data_proc_state::data_continue);//data
-            size_t part_size = bytes_transferred - req_.header_len();
-            if (part_size != 0) {
-                req_.reduce_left_body_size(part_size);
-                req_.set_part_data({ req_.current_part(), part_size });
-                req_.write_upload_data(req_.current_part(), part_size);
-                //call_back();
-            }
-
-            if (req_.has_recieved_all()) {
-                //on finish
-                req_.set_state(data_proc_state::data_end);
-                call_back();
-                do_write();
-            }
-            else {
-                req_.fit_size();
-                req_.set_current_size(0);
-                do_read_octet_stream_body();
-            }
-        }
-
-        void do_read_octet_stream_body() {
-            auto self = this->shared_from_this();
-            // TODO
-            //boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), req_.left_body_len()),
-                //[this, self](const int& ec, size_t bytes_transferred) {
-                //if (ec) {
-                    //req_.set_state(data_proc_state::data_error);
-                    //call_back();
-                    //close();
-                    //return;
-                //}
-
-                //req_.set_part_data({ req_.buffer(), bytes_transferred });
-                //req_.write_upload_data(req_.buffer(), bytes_transferred);
-                ////call_back();
-
-                //req_.reduce_left_body_size(bytes_transferred);
-
-                //if (req_.body_finished()) {
-                    //req_.set_state(data_proc_state::data_end);
-                    //call_back();
-                    //do_write();
-                //}
-                //else {
-                    //do_read_octet_stream_body();
-                //}
-            //});
-        }
-
-        //-------------octet-stream----------------//
 
         //-------------form urlencoded----------------//
         //TODO: here later will refactor the duplicate code
@@ -671,7 +383,8 @@ namespace netcore {
                 size_t part_size = bytes_transferred - req_.header_len();
                 req_.reduce_left_body_size(part_size);
                 //req_.fit_size();
-                do_read_form_urlencoded();
+                //do_read_form_urlencoded();
+                //TODO change to return process_state::need_read
             }
         }
 
@@ -692,29 +405,6 @@ namespace netcore {
                 //do_write();
         }
 
-        void do_read_form_urlencoded() {
-
-            auto self = this->shared_from_this();
-            // TODO
-            //boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), req_.left_body_len()),
-                //[this, self](const int& ec, size_t bytes_transferred) {
-                //if (ec) {
-                    ////LOG_WARN << ec.message();
-                    //close();
-                    //return;
-                //}
-
-                //req_.update_size(bytes_transferred);
-                //req_.reduce_left_body_size(bytes_transferred);
-
-                //if (req_.body_finished()) {
-                    //handle_url_urlencoded_body();
-                //}
-                //else {
-                    //do_read_form_urlencoded();
-                //}
-            //});
-        }
         //-------------form urlencoded----------------//
 
         void call_back() {
@@ -844,14 +534,14 @@ namespace netcore {
         }
 
         //处理multipart
-        bool handle_multipart() {
+        process_state handle_multipart() {
             //LOG_DEBUG("=====================handle_multipart=====================");
             if (upload_check_) {
                 bool r = (*upload_check_)(req_, res_);
                 if (!r) {
                     Close();
                     response_back(status_type::bad_request, "upload_check_ error at line "+ std::to_string(__LINE__));
-                    return TO_EPOLL_WRITE;
+                    return process_state::need_write;
                 }                    
             }
 
@@ -861,23 +551,23 @@ namespace netcore {
             //LOG_DEBUG("has_error %d",has_error);
             if (has_error) {
                 response_back(status_type::bad_request, "mutipart error");
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             //LOG_DEBUG("req_.has_recieved_all_part() %d",req_.has_recieved_all_part());
             if (req_.has_recieved_all_part()) { //接收完全部的数据,结束
                 call_back();
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
             else {
                 req_.set_current_size(0);
                 continue_work_ = &connection::do_read_multipart;
-                return TO_EPOLL_READ;
+                return process_state::need_read;
             }
         }
 
         //读multipart
-        bool do_read_multipart() {
+        process_state do_read_multipart() {
             //LOG_DEBUG("Run Function do_read_multipart");
             req_.fit_size();
             //auto self = this->shared_from_this();
@@ -895,54 +585,24 @@ namespace netcore {
                 keep_alive_ = false;
                 response_back(status_type::bad_request, "mutipart error");
                 clear_continue_workd();
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             if (req_.body_finished()) {
                 call_back();
                 clear_continue_workd();
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             req_.set_current_size(0);
             continue_work_ = &connection::do_read_multipart;
-            return TO_EPOLL_READ;
+            return process_state::need_read;
         }
 
-        //读取一部分数据
-        void do_read_part_data() {
-            auto self = this->shared_from_this();
-            // TODO
-            //boost::asio::async_read(socket(), boost::asio::buffer(req_.buffer(), req_.left_body_size()),
-                //[self, this](int ec, std::size_t length) {
-                //if (ec) {
-                    //req_.set_state(data_proc_state::data_error);
-                    //call_back();
-                    //return;
-                //}
-
-                //bool has_error = parse_multipart(0, length);
-
-                //if (has_error) {
-                    //response_back(status_type::bad_request, "mutipart error");
-                    //return;
-                //}
-
-                //reset_timer();
-                //if (!req_.body_finished()) {
-                    //do_read_part_data();
-                //}
-                //else {
-                    ////response_back(status_type::ok, "multipart finished");
-                    //call_back();
-                    //do_write();
-                //}
-            //});
-        }
         //-------------multipart----------------------//
 
         //处理 只有 headers 的情况
-        bool handle_header_request() {
+        process_state handle_header_request() {
             if (is_upgrade_) { //websocket
                 //TODO 增加一个检查是否可以进行websock连接的函数
                 // 注意!! 这里使用了 route的_ap
@@ -954,19 +614,19 @@ namespace netcore {
                     is_upgrade_ = false;
                     keep_alive_ = false;
                     res_.set_status_and_content(status_type::forbidden,"not allowed");
-                    return TO_EPOLL_WRITE;
+                    return process_state::need_write;
                 }
                 req_.set_http_type(content_type::websocket);
                 //timer_.cancel();
                 ws_.upgrade_to_websocket(req_, res_);   //生成 res_里的返回内容
                 response_handshake();           //写内容
-                return TO_EPOLL_READ;
+                return process_state::need_read;
             }
 
             bool r = handle_gzip();
             if (!r) {
                 response_back(status_type::bad_request, "gzip uncompress error");
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             call_back(); // 调用 http_router_ 其时就是route
@@ -976,24 +636,249 @@ namespace netcore {
                 //return TO_EPOLL_WRITE;
 
             if (req_.get_state() == data_proc_state::data_error) {
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
-            return TO_EPOLL_WRITE;
+            return process_state::need_write;
 
-            //if (!res_.need_delay())
-                //do_write();
         }
 
         //-------------web socket----------------//
-        void response_handshake();
-        bool handle_ws_data(); //处理ws数据
-        bool do_read_websocket_head();
+        //@desc 返回握手信息,其实就是直接写数据
+        void response_handshake()
+        {
+            std::vector<std::string> buffers = res_.to_buffers();
+            //LOG_DEBUG("response_handshake : %d",buffers.empty());
+            std::string buf_to_send;
+            if (buffers.empty()) {
+                Close(); // TODO 这里要改 我们不主动的关闭自己
+                return;
+            }
+            // 直接写
+            for (auto& e : buffers) {
+                //LOG_DEBUG("%s,%d",e.c_str(),e.length());
+                buf_to_send.append(std::move(e));
+            }
+            //LOG_DEBUG("%s",buf_to_send.c_str());
+            direct_write(buf_to_send.c_str(), buf_to_send.length());
+            //set_continue_workd
+            //continue_work_ = &connection::ws_response_handshake_continue_work;
 
+            req_.set_state(data_proc_state::data_begin); // alias ws_open
+            call_back();
+            req_.call_event(req_.get_state());
+            req_.set_current_size(0); //清空
+            //do_read_websocket_head(SHORT_HEADER);
+            continue_work_ = &connection::handle_ws_data; //以后读取的数据会进入 handle_ws_data
+            //return TO_EPOLL_READ; //转入读取
+        }
+
+        // 直接写数据,而不是写res 里的内容
+        ssize_t direct_write(const char * data ,std::size_t len /*, int* saveErrno */) {
+            //LOG_DEBUG("write data %s \n",res_.response_str().c_str());
+            Writen(data,len); //每一次写在rep_str_里
+            //last_transfer_ = 0 ;
+            return len;
+        }
+
+        //返回写入的长度，<=0 是错误
+        int Writen(const char *buffer,const size_t n)
+        {
+            int nLeft,idx,nwritten;
+            nLeft = n;  
+            idx = 0;
+            while(nLeft > 0 )
+            {
+                if ( (nwritten = ::send(fd_, buffer + idx,nLeft,0)) <= 0) 
+                    return nwritten;
+                nLeft -= nwritten;
+                idx += nwritten;
+            }
+            return n;
+        }
+
+        //处理ws数据
+        process_state handle_ws_data() 
+        {
+            auto pointer = req_.data(); // 数据的起始地址
+            std::size_t start = 0,end = req_.get_cur_size_();
+
+            std::string ws_body;
+            //LOG_DEBUG("handle_ws_data, req_.size %d,%d,%d",start,end,end-start);
+
+            do {
+
+                /*---------- ws_header ----------*/
+                auto len  = end - start; // TODO
+                auto ret  = ws_.parse_header(pointer + start, len);
+
+                if (ret >=   parse_status::complete  /*0*/ ) { //完成了  do_nothing
+                    start += ret; //更新开始的位置
+                    len = end - start;
+                }
+                else if (ret == parse_status::not_complete) {
+                    return process_state::need_read;
+                }
+                else { //发生错误
+                    req_.call_event(data_proc_state::data_error);
+                    Close(); //结束 TODO 应该在哪里结束?
+                    return process_state::need_write;
+                }
+                /*---------- ws_header end ----------*/
+
+                /*---------- ws_body ----------*/
+                std::string payload;
+                ws_frame_type wsft = ws_.parse_payload(pointer + start, len, payload); //解析payload
+                if (wsft == ws_frame_type::WS_INCOMPLETE_FRAME) { // 末完成的frame
+                    // 重新去读取, TODO 把已经处理得到的数据存起来, 显然定义一个新类成员变量 last_ws_str_
+                    //req_.update_size(bytes_transferred);
+                    //req_.reduce_left_body_size(bytes_transferred);
+                    //continue_work_ = &connection::do_read_websocket_data;
+                    //return TO_EPOLL_READ; //继续去读
+                    return process_state::need_read;
+                }
+                if (wsft == ws_frame_type::WS_INCOMPLETE_TEXT_FRAME || wsft == ws_frame_type::WS_INCOMPLETE_BINARY_FRAME) {
+                    last_ws_str_.append(std::move(payload));
+                }
+
+                //进行处理
+                //根据结果
+                if (!handle_ws_frame(wsft, std::move(payload), 0))
+                    return process_state::need_write;
+
+            } while ( ws_.is_fin() == false );
+
+            req_.set_current_size(0);
+            //LOG_DEBUG("after set current_size ,%d",req_.get_cur_size_());
+            return process_state::need_read;
+        }
+
+        process_state do_read_websocket_head()
+        {
+            size_t length = req_.current_size(); //TODO 读取的长度 ?
+            int ret = ws_.parse_header(req_.buffer(), length); //解析头
+            //req_.set_current_size(0);
+
+            if (ret == parse_status::complete) { //完成了
+                //read payload
+                auto payload_length = ws_.payload_length();
+                req_.set_body_len(payload_length);
+                if (req_.at_capacity(payload_length)) { //超过最大容量
+                    req_.call_event(data_proc_state::data_error);
+                    Close(); //结束 TODO 应该在哪里结束?
+                    return process_state::need_write;
+                }
+                req_.set_current_size(0); // 测试完了一个frame 不应该清零
+                req_.fit_size(); // TODO fit size有什么作用
+                continue_work_ = &connection::do_read_websocket_data; 
+            }
+            else if (ret == parse_status::not_complete) {
+                //req_.set_current_size(bytes_transferred); // ?
+                return process_state::need_read;
+                //do_read_websocket_head(ws_.left_header_len());
+            }
+            else { //发生错误
+                req_.call_event(data_proc_state::data_error);
+                Close(); //结束 TODO 应该在哪里结束?
+            }
+            return process_state::need_read;
+        }
+
+        //TODO
         bool ws_response_handshake_continue_work();
-        bool do_read_websocket_data(); 
-        bool handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred);
-        void ws_ping() ;
+
+        process_state do_read_websocket_data() 
+        {
+
+            auto bytes_transferred = 1;
+            if (req_.body_finished()) {
+                req_.set_current_size(0);
+                bytes_transferred = ws_.payload_length(); // TODO 长度应该如何设定?
+            }
+
+            std::string payload;
+            ws_frame_type ret = ws_.parse_payload(req_.buffer(), bytes_transferred, payload); //解析payload
+            if (ret == ws_frame_type::WS_INCOMPLETE_FRAME) { // 末完成的frame
+                req_.update_size(bytes_transferred);
+                req_.reduce_left_body_size(bytes_transferred);;
+                continue_work_ = &connection::do_read_websocket_data;
+                return process_state::need_read;
+            }
+
+            if (ret == ws_frame_type::WS_INCOMPLETE_TEXT_FRAME || ret == ws_frame_type::WS_INCOMPLETE_BINARY_FRAME) {
+                last_ws_str_.append(std::move(payload));
+            }
+
+            //进行处理
+            //根据结果
+            if (!handle_ws_frame(ret, std::move(payload), bytes_transferred))
+                return process_state::need_write;
+
+            req_.set_current_size(0);
+            continue_work_ =  &connection::do_read_websocket_head;
+            return process_state::need_read;
+        }
+
+        bool handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred)
+        {
+            switch (ret)
+            {
+                case netcore::ws_frame_type::WS_ERROR_FRAME:
+                    req_.call_event(data_proc_state::data_error);
+                    Close(); /// TODO 关闭
+                    return false;
+                case netcore::ws_frame_type::WS_OPENING_FRAME:
+                    break;
+                case netcore::ws_frame_type::WS_TEXT_FRAME:
+                case netcore::ws_frame_type::WS_BINARY_FRAME:
+                    {
+                        //reset_timer();
+                        std::string temp;
+                        if (!last_ws_str_.empty()) {
+                            temp = std::move(last_ws_str_);
+                        }
+                        temp.append(std::move(payload));
+                        req_.set_part_data(temp);
+                        req_.call_event(data_proc_state::data_continue);
+                    }
+                    //on message
+                    break;
+                case netcore::ws_frame_type::WS_CLOSE_FRAME:
+                    {
+                        //LOG_DEBUG("handle_ws_frame type : ws_frame_type::WS_CLOSE_FRAME");
+                        close_frame close_frame = ws_.parse_close_payload(payload.data(), payload.length());
+                        const int MAX_CLOSE_PAYLOAD = 123;
+                        size_t len = std::min<size_t>(MAX_CLOSE_PAYLOAD, payload.length());
+                        req_.set_part_data({ close_frame.message, len });
+                        req_.call_event(data_proc_state::data_close); // 调用
+
+                        std::string close_msg = ws_.format_close_payload(opcode::close, close_frame.message, len);
+                        auto header = ws_.format_header(close_msg.length(), opcode::close);
+                        WS_manager::get_instance().send_ws_string(GetFd(), header+close_msg,true);
+                        return false;
+                        //send_msg(std::move(header), std::move(close_msg),true); //发送
+                    }
+                    break;
+                case netcore::ws_frame_type::WS_PING_FRAME:
+                    {
+                        auto header = ws_.format_header(payload.length(), opcode::pong);
+                        //send_msg(std::move(header), std::move(payload));
+                        WS_manager::get_instance().send_ws_string(GetFd(), header+payload);
+                    }
+                    break;
+                case netcore::ws_frame_type::WS_PONG_FRAME:
+                    ws_ping();
+                    break;
+                default:
+                    break;
+            }
+
+            return true;
+        }
+
+
+        //TODO
+        void ws_ping() {}
         //-------------web socket----------------//
 
         //-------------chunked(read chunked not support yet, write chunked is ok)----------------------//
@@ -1010,45 +895,42 @@ namespace netcore {
          * 重复执行的route会有性能损失
          * 最好的方法是记录 直接要执行的route,不用筛选
          */
-        bool continue_write_then_route(){
+        process_state continue_write_then_route(){
             call_back();// 去route
-            return TO_EPOLL_WRITE;
+            return process_state::need_write;
         }
 
         //-------------chunked(read chunked not support yet, write chunked is ok)----------------------//
 
-        bool handle_body() {
+        process_state handle_body() {
             if (req_.at_capacity()) {
                 response_back(status_type::bad_request, "The body is too long, limitation is 3M");
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             bool r = handle_gzip();
             if (!r) {
                 response_back(status_type::bad_request, "gzip uncompress error");
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             if (req_.get_content_type() == content_type::multipart) {
                 bool has_error = parse_multipart(req_.header_len(), req_.current_size() - req_.header_len());
                 if (has_error) {
                     response_back(status_type::bad_request, "mutipart error");
-                    return TO_EPOLL_WRITE;
+                    return process_state::need_write;
                 }
-                //do_write();
-                return TO_EPOLL_WRITE; // ? 这里是写吗
+                return process_state::need_write;
             }
 
             if (req_.body_len()>0&&!req_.check_request()) {
                 response_back(status_type::bad_request, "request check error");
-                return TO_EPOLL_WRITE;
+                return process_state::need_write;
             }
 
             call_back(); //调用handler_request_
-            return TO_EPOLL_WRITE;
+            return process_state::need_write;
 
-            //if (!res_.need_delay()) //不需要延迟，直接写 TODO 改成write_ EPOLLOUT 事件
-                //do_write();
         }
 
         bool handle_gzip() {
@@ -1061,13 +943,11 @@ namespace netcore {
 
         void response_back(status_type status, std::string&& content) {
             res_.set_status_and_content(status, std::move(content));
-            do_write(); //response to client
         }
 
         void response_back(status_type status) {
             res_.set_status_and_content(status);
             //disable_keep_alive();
-            //do_write(); //response to client
         }
 
 
@@ -1091,15 +971,9 @@ namespace netcore {
             }
         }
 
-        void shutdown() {
-            int ignored_ec; 
-            //TODO  close(fd)
-            //socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
-        }
-
         //-----------------send message----------------//
         void send_msg(std::string&& data) {
-            std::lock_guard<std::mutex> lock(buffers_mtx_);
+            //std::lock_guard<std::mutex> lock(buffers_mtx_);
             buffers_[active_buffer_ ^ 1].push_back(std::move(data)); // move input data to the inactive buffer
             if (!writing())
                 do_write_msg();
@@ -1121,26 +995,6 @@ namespace netcore {
             }
             buffers_[active_buffer_].clear(); //清空
             buffer_seq_.clear();    //清空
-
-            //boost::asio::async_write(socket(), buffer_seq_, [this, self = this->shared_from_this()](const int& ec, size_t bytes_transferred) {
-                //std::lock_guard<std::mutex> lock(buffers_mtx_); //两次获取
-                //buffers_[active_buffer_].clear(); //清空
-                //buffer_seq_.clear();    //清空
-
-                //if (!ec) {
-                    //if (send_ok_cb_)
-                        //send_ok_cb_();
-                    //if (!buffers_[active_buffer_ ^ 1].empty()) // have more work
-                        //do_write_msg();
-                //}
-                //else {
-                    //if (send_failed_cb_)
-                        //send_failed_cb_(ec);
-                    //req_.set_state(data_proc_state::data_error);
-                    //call_back();
-                    //close();
-                //}
-            //});
         }
 
         bool writing() const { return !buffer_seq_.empty(); } // buffer_seq_ 不空的时候是在写
@@ -1152,16 +1006,12 @@ namespace netcore {
         }
         //-----------------send message----------------//
 public:
-    inline void update_len_(int ext_size){
-        len_ += ext_size;
-    }
-public:
         //-----------------HttpConn function----------------//
-        virtual void init(int fd, const sockaddr_in& addr) override{
+        void init(int fd, const sockaddr_in& addr) {
             if ( !has_continue_workd() ){ //新的
                 req_.set_conn(this->shared_from_this()); // ?
-                userCount++;
-                addr_ = addr;
+                //userCount++;
+                //addr_ = addr;
                 fd_ = fd;
                 //writeBuff_.RetrieveAll();
                 //readBuff_.RetrieveAll();
@@ -1172,56 +1022,21 @@ public:
         }
 
         //关闭
-        virtual void Close() override{
+        void Close() {
             if (has_closed_) {
                 return;
             }
             reset(); //这里不reset 因为关闭的时间reset可能会导致失败 TODO
             req_.close_upload_file();
             has_closed_ = true;
-            has_shake_ = false;
+            has_shake_  = false;
             continue_work_ = nullptr;
-            userCount--;
-            ::close(fd_);
             //LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }
 
-        //核心 这里处理读取
-        virtual ssize_t read(int* saveErrno) override { //不停的读，直到结束为止
-            //return pre_read_szie = read_work();
-            bool at_capacity = false;
-            return last_transfer_ =  __read_all(saveErrno);
-        }
 
-        //如果想要断续写， saveErrno = EAGAIN ret < 0 to_wirte_byte !=0
-        virtual ssize_t write(int* saveErrno) override{
-            //LOG_DEBUG("write data %s \n",res_.response_str().c_str());
-            Writen(res_.response_str().c_str(), res_.response_str().size()); //每一次写在rep_str_里
-            last_transfer_ = 0 ;
-            return res_.response_str().size();
-        }
 
-        /*  return 
-         *      true 表示读取完毕 ,进入写入环节
-         *      false 表示读取未完全 ,下一次还是读取
-         * */
-        virtual bool process() override {
-            if (req_.at_capacity()) {  //超过最大容量
-                response_back(status_type::bad_request, "The request is too long, limitation is 3M");
-                return TO_EPOLL_WRITE;
-            }
-            //if( last_transfer_ == 0) //暂时不以这个作为写或读的标准
-                //return TO_EPOLL_READ;
-            if( !has_continue_workd() )
-                return handle_read(last_transfer_);
-            else
-                return (this->*continue_work_)();
-        }
-        virtual int ToWriteBytes() override {
-            return 0;
-        }
-
-        virtual bool IsKeepAlive() const override{
+        bool IsKeepAlive() const {
             //LOG_INFO("keep_alive_ %d\n",keep_alive_);
             return keep_alive_ && is_upgrade_;
         }
@@ -1234,76 +1049,14 @@ public:
             continue_work_ = nullptr;
         }
 
-        // 直接写数据,而不是写res 里的内容
-        ssize_t direct_write(const char * data ,std::size_t len /*, int* saveErrno */) {
-            //LOG_DEBUG("write data %s \n",res_.response_str().c_str());
-            Writen(data,len); //每一次写在rep_str_里
-            //last_transfer_ = 0 ;
-            return len;
-        }
+    private:
+        // 这里本应该是读取与写入
+        // 但是为了代码的简单
+        // 把读取与写入放到了connection的外部
+        // connection 只进行数据的处理
 
-private:
-
-        //-----------------HttpConn function end----------------//
-
-
-        //读取一部分数据
-        inline int __read_some(char * buff_,int size){
-            return recv(fd_, buff_, size, 0);
-        }
-
-        inline int __read_all(int * saveErrno){ //读取所有能读取的数据
-            int len = 0;
-            //LOG_DEBUG("before Read, req_ buf current_size %d",req_.get_cur_size_());
-            //一直读取,直到不能再读读取了位置
-            do {
-                int siz = recv(fd_,req_.buffer(),req_.left_size(),0);
-                if( siz <=0 ){
-                    *saveErrno = errno;
-                    break;
-                }
-                len += siz; //读取的字节数
-                req_.update_and_expand_size(siz); // 更新和拓展req_的bufer
-                if(req_.left_size() == 0) break;  // 没有空间了
-            }while(true); //isLT
-            //printf("read_char begin ======================= \n\n");
-            //for(auto i=req_.buf_.data(),j=i;i-j < len;i++ ){
-                //printf("%c",*i);
-            //}
-            //printf("read_char end ======================= \n\n");
-            //LOG_INFO("__read_all read size %d",len);
-            //LOG_DEBUG("after Read, req_ buf current_size %d",req_.get_cur_size_());
-            return len;
-        }
-
-        //异步写 是写到Buff里
-        inline int async_write(std::string_view str){
-            //writeBuff_.Append(str.data(), str.length());
-            return str.length();
-        }
-
-        ssize_t write(int *saveErrno, std::string_view str){
-            int siz = Writen(str.data(), str.length());
-            if( siz<= 0 ) *saveErrno = siz;
-            return siz;
-        }
-
-        //返回写入的长度，<=0 是错误
-        int Writen(const char *buffer,const size_t n)
-        {
-            int nLeft,idx,nwritten;
-            nLeft = n;  
-            idx = 0;
-            while(nLeft > 0 )
-            {
-                if ( (nwritten = send(fd_, buffer + idx,nLeft,0)) <= 0) 
-                    return nwritten;
-                nLeft -= nwritten;
-                idx += nwritten;
-            }
-            return n;
-        }
-        //-----------------base function----------------//
+    private:
+        /*---------- member ----------*/
 
         bool enable_timeout_ = true;
         response res_; //响应
@@ -1317,7 +1070,6 @@ private:
         bool has_shake_ = false;
 
         //for writing message
-        std::mutex buffers_mtx_;
         std::vector<std::string> buffers_[2]; // a double buffer
         std::vector<char> buffer_seq_; // TODO unuse
         int active_buffer_ = 0;
@@ -1336,17 +1088,17 @@ private:
         ws_connection_check * ws_connection_check_ = nullptr;
 
         std::function<bool(request& req, response& res)>* upload_check_ = nullptr;
-        std::any tag_;
         std::function<void(request&, std::string&)> multipart_begin_ = nullptr;
 
-        size_t len_ = 0; // 和pipline 有关,但我不知道什么是pipline
         size_t last_transfer_ = 0;  //最后转化了多少字节
         //bool isFirstRead{true};
-        using continue_work = bool(connection::*)();
+        using continue_work = process_state(connection::*)();
         continue_work continue_work_ = nullptr;
 
         std::atomic_bool has_closed_ = false;
-    };
+
+        NativeSocket fd_{-1};
+};
 
     inline constexpr data_proc_state ws_open    = data_proc_state::data_begin;
     inline constexpr data_proc_state ws_close   = data_proc_state::data_close;

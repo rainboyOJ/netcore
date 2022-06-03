@@ -4,6 +4,7 @@
 
 #include <thread>
 #include "core.hpp"
+#include "connection.hpp"
 
 namespace netcore {
 
@@ -15,6 +16,7 @@ class Server {
         IoContext m_ctx;
         std::thread m_thread;
         Acceptor m_acceptor;
+        std::string static_dir = "www";
         int m_id;
     public:
         Server()  = delete;
@@ -63,24 +65,45 @@ class Server {
         {
             for(;;) {
                 try {
-                    char buff[100];
-                    auto nbtyes = co_await conn->async_read(buff,sizeof(buff)-1,3s);
-                    // 进行相应的处理
-                    if( nbtyes == 0)
-                        break;
-                    log("server :[",m_id,"]recv bytes:",nbtyes);
-                    log("recv content:",std::string(buff));
-                    //log("sleep 10...");
-                    log("1,ready to send nbytes:",nbtyes);
-                    std::this_thread::sleep_for(std::chrono::seconds(3));
-                    log("2,ready to send nbytes:",nbtyes);
+                    bool break_for_flag = false;
 
-                    nbtyes = co_await conn->async_send(buff, nbtyes);
+                    auto conn_handle = std::make_shared<connection>(
+                            3*1024*1024, //max_req_size 3MB
+                            10*60, // keep_alive_timeout
+                            nullptr,      //http_handler  的函数指针
+                            nullptr, // http_handler_check 的函数指针
+                            nullptr,// ws_connection_check * ws_conn_check,
+                            static_dir,    //静态资源目录
+                            nullptr,//upload_check_handler * upload_check //上传查询
+                            conn->socket()
+                            );
 
-                    if( nbtyes == 0){
-                        log("======> send nbytes 0");
-                        break;
+                    do  {
+
+                        auto nbtyes = co_await conn->async_read(conn_handle->req().buffer(),conn_handle->req().left_size(),100s);
+                        // 进行相应的处理
+                        if( nbtyes == 0){
+                            break_for_flag = true;
+                            break ;
+                        }
+
+                        auto pc_state = conn_handle->process();
+                        if( pc_state == process_state::need_read)
+                            continue;
+                    } while(0);
+
+                    if( break_for_flag ) break;
+
+
+                    auto send_bufs = conn_handle->res().to_buffers();
+                    for (auto& e : send_bufs) {
+                        auto nbtyes = co_await conn->async_send(e.data(),e.length(),100s);
+                        if( nbtyes == 0){
+                            log("======> send nbytes 0");
+                            break;
+                        }
                     }
+
 
                 }
                 catch(const netcore::SendError& e){
