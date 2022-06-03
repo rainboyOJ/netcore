@@ -1,12 +1,21 @@
-// 有关文件下载的函数
-#include "hs_utils.h"
+/**
+ * 常用的http_sever 使用的工具类函数
+ */
+#pragma once
+#include <filesystem>
+#include "connection.hpp"
 
 namespace netcore {
+
+struct hs_utils {
     
 
-std::string get_send_data(request& req, const size_t len){
+/**
+ * @brief 得到长度为len的数据
+ */
+static std::string get_send_data(request& req, const size_t len){
     auto conn = req.get_conn(); //得到connection 的指针
-    auto in = std::any_cast<std::shared_ptr<std::ifstream>>(conn->get_tag()); //得到 in
+    auto in = conn->get_file_tag(); //得到 in
     std::string str;
     str.resize(len);
     in->read(&str[0], len);
@@ -17,28 +26,35 @@ std::string get_send_data(request& req, const size_t len){
     return str;
 }
 
-void write_ranges_header(request& req, std::string_view mime, std::string filename, std::string file_size){
-    std::string header_str = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-origin: *\r\nAccept-Ranges: bytes\r\n"; header_str.append("Content-Disposition: attachment;filename=");
-    header_str.append(std::move(filename)).append("\r\n"); //下载的文件名
-    header_str.append("Connection: keep-alive\r\n");
-    header_str.append("Content-Type: ").append(mime).append("\r\n");//类型
-    header_str.append("Content-Length: "); //长度
-    header_str.append(file_size).append("\r\n\r\n"); //文件头结束
-    //LOG_DEBUG("write_ranges_header :%s \n\n",header_str.c_str());
-    req.get_conn()->write_ranges_header(std::move(header_str)); //存入
+//判断一个文件是否是小文件
+static bool is_small_file(std::ifstream* in,request& req) {
+    auto file_begin = in->tellg();
+    in->seekg(0, std::ios_base::end);
+    auto  file_size = in->tellg();
+    in->seekg(file_begin);
+    req.save_request_static_file_size(file_size);
+    return file_size <= 5 * 1024 * 1024; //5MB 以下是小文件
 }
 
-void write_ranges_data(request& req) {
-    //LOG_DEBUG("============ write_ranges_data");
-    const size_t len = 3 * 1024 * 1024; // 默认3MB
-    auto str = get_send_data(req, len);
-    //LOG_DEBUG("============ write_ranges_data %s\n",str.c_str());
-    auto read_len = str.size();
-    bool eof = (read_len == 0 || read_len != len); // 是否结束
-    req.get_conn()->write_ranges_data(std::move(str), eof);
+//发送一个小文件
+static void send_small_file(response& res, std::ifstream* in, std::string_view mime) {
+    res.add_header("Access-Control-Allow-origin", "*");
+    res.add_header("Content-type", std::string(mime.data(), mime.size()) + "; charset=utf8");
+    std::stringstream file_buffer;
+    file_buffer << in->rdbuf(); //读取所有
+    if constexpr (__config__::staticResCacheMaxAge>0)
+    {
+        const std::string max_age = std::string("max-age=") + std::to_string(__config__::staticResCacheMaxAge);
+        res.add_header("Cache-Control", max_age.data());
+    }
+#ifdef CINATRA_ENABLE_GZIP //TODO
+    res.set_status_and_content(status_type::ok, file_buffer.str(), res_content_type::none, content_encoding::gzip);
+#else
+    res.set_status_and_content(status_type::ok, file_buffer.str());
+#endif
 }
 
-void write_chunked_header(request& req, std::shared_ptr<std::ifstream> in, std::string_view mime) {
+static void write_chunked_header(request& req, std::shared_ptr<std::ifstream> in, std::string_view mime) {
     auto range_header = req.get_header_value("range");
     req.set_range_flag(!range_header.empty()); //分块发送
     req.set_range_start_pos(range_header);
@@ -64,7 +80,7 @@ void write_chunked_header(request& req, std::shared_ptr<std::ifstream> in, std::
 }
 
 
-void write_chunked_body(request& req) {
+static void write_chunked_body(request& req) {
     const size_t len = 3 * 1024 * 1024;
     auto str = get_send_data(req, len); //得到发送的数据
     auto read_len = str.size();
@@ -72,37 +88,34 @@ void write_chunked_body(request& req) {
     req.get_conn()->write_chunked_data(std::move(str), eof);
 }
 
-
-bool is_small_file(std::ifstream* in,request& req) {
-    auto file_begin = in->tellg();
-    in->seekg(0, std::ios_base::end);
-    auto  file_size = in->tellg();
-    in->seekg(file_begin);
-    req.save_request_static_file_size(file_size);
-    return file_size <= 5 * 1024 * 1024; //5MB 以下是小文件
+/**
+ * 以ranges方式下载的头部
+ */
+static void write_ranges_header(request& req, std::string_view mime, std::string filename, std::string file_size){
+    std::string header_str = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-origin: *\r\nAccept-Ranges: bytes\r\n"; header_str.append("Content-Disposition: attachment;filename=");
+    header_str.append(std::move(filename)).append("\r\n"); //下载的文件名
+    header_str.append("Connection: keep-alive\r\n");
+    header_str.append("Content-Type: ").append(mime).append("\r\n");//类型
+    header_str.append("Content-Length: "); //长度
+    header_str.append(file_size).append("\r\n\r\n"); //文件头结束
+    //LOG_DEBUG("write_ranges_header :%s \n\n",header_str.c_str());
+    req.get_conn()->write_ranges_header(std::move(header_str)); //存入
 }
 
-void send_small_file(response& res, std::ifstream* in, std::string_view mime) {
-    res.add_header("Access-Control-Allow-origin", "*");
-    res.add_header("Content-type", std::string(mime.data(), mime.size()) + "; charset=utf8");
-    std::stringstream file_buffer;
-    file_buffer << in->rdbuf(); //读取所有
-    if constexpr (__config__::staticResCacheMaxAge>0)
-    {
-        const std::string max_age = std::string("max-age=") + std::to_string(__config__::staticResCacheMaxAge);
-        res.add_header("Cache-Control", max_age.data());
-    }
-#ifdef CINATRA_ENABLE_GZIP //TODO
-    res.set_status_and_content(status_type::ok, file_buffer.str(), res_content_type::none, content_encoding::gzip);
-#else
-    res.set_status_and_content(status_type::ok, file_buffer.str());
-#endif
+static void write_ranges_data(request& req) {
+    //LOG_DEBUG("============ write_ranges_data");
+    const size_t len = 3 * 1024 * 1024; // 默认3MB
+    auto str = get_send_data(req, len);
+    //LOG_DEBUG("============ write_ranges_data %s\n",str.c_str());
+    auto read_len = str.size();
+    bool eof = (read_len == 0 || read_len != len); // 是否结束
+    req.get_conn()->write_ranges_data(std::move(str), eof);
 }
 
 /**
  * 传递一个文件的路径进行
  */
-void process_download(std::string& file_path,request& req,response& res){
+static void process_download(std::string& file_path,request& req,response& res){
 
     //if (download_check_) { // 如果有下载检查
     //bool r = download_check_(req, res);
@@ -139,7 +152,7 @@ void process_download(std::string& file_path,request& req,response& res){
                     }
                 }
 
-                req.get_conn()->set_tag(in); // tag变成in
+                req.get_conn()->set_file_tag(in); // tag变成in
 
                 if(is_small_file(in.get(),req)){
                     send_small_file(res, in.get(), mime);
@@ -181,5 +194,8 @@ void process_download(std::string& file_path,request& req,response& res){
             break;
     }
 }
+
+
+};
 
 } // end namespace netcore

@@ -1049,6 +1049,13 @@ public:
             continue_work_ = nullptr;
         }
 
+        void set_file_tag(std::shared_ptr<std::ifstream> ftag){
+            m_file_tag = ftag;
+        }
+        auto get_file_tag(){
+            return m_file_tag;
+        }
+
     private:
         // 这里本应该是读取与写入
         // 但是为了代码的简单
@@ -1057,6 +1064,9 @@ public:
 
     private:
         /*---------- member ----------*/
+
+        //文件指针
+        std::shared_ptr<std::ifstream> m_file_tag = nullptr;
 
         bool enable_timeout_ = true;
         response res_; //响应

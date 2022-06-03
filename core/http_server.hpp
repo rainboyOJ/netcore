@@ -80,15 +80,6 @@ namespace netcore {
             }
         }
 
-        /**
-         * @desc 注册 websocket 连接检查函数
-         */
-        void regist_ws_conn_check(
-                std::string_view url_name,
-                websocket_before_ap_mananger::AP_Type&& ap
-                ){
-            ws_before_ap.regist(url_name, std::move(ap));
-        }
 
         void set_static_res_handler();
 
@@ -171,67 +162,8 @@ namespace netcore {
             }
         }
 
-        /**
-         * desc: 核心函数,添加一个 http url的处理函数
-         * 作用: 将 function 处理函数 注册到 http_router_ 里
-         * TODO 为什么要 检查cache,cache 有什么用?
-         */
-        template<http_method... Is, typename Function, typename... AP>
-        void set_http_handler(std::string_view name, Function&& f, AP&&... ap) {
-            //只要AP里面有一个是 enable_cache<bool>类型
-            if constexpr(has_type<enable_cache<bool>, std::tuple<std::decay_t<AP>...>>::value) {//for cache
-                bool b = false;
-                ((!b&&(b = need_cache(std::forward<AP>(ap)))),...); //折叠表达式
-                if (!b) {
-                    http_cache::get().add_skip(name); //TODO 核心是我不懂 http_cache 的作用
-                }else{
-                    http_cache::get().add_single_cache(name);
-                }
-                auto tp = filter<enable_cache<bool>>(std::forward<AP>(ap)...);
-                auto lm = [this, name, f = std::move(f)](auto... ap) {
-                    http_router_.register_handler<Is...>(name, std::move(f), std::move(ap)...);
-                };
-                std::apply(lm, std::move(tp));
-            }
-            else {
-                http_router_.register_handler<Is...>(name, std::forward<Function>(f), std::forward<AP>(ap)...);
-            }
-        }
 
-        template<http_method... Is, typename Function, typename... AP>
-        void set_http_regex_handler(std::regex & name,Function&& f,const AP&&... ap){
-            http_router_.register_handler_for_regex<Is...>(name, std::forward<Function>(f), std::forward<AP>(ap)...);
-        }
 
-        //设置 静态文件的目录
-        void set_static_dir(std::string path) { 
-            set_file_dir(std::move(path), static_dir_);
-        }
-
-        //设置上传文件的目录
-        void set_upload_dir(std::string path) {
-            set_file_dir(std::move(path), upload_dir_);
-        }
-
-        void set_file_dir(std::string&& path, std::string& dir) {
-            
-            //default: current path + "www"/"upload"
-            //"": current path
-            //"./temp", "temp" : current path + temp
-            //"/temp" : linux path; "C:/temp" : windows path
-            
-            if (path.empty()) {
-                dir = fs::current_path().string();
-                return;
-            }
-
-            if (path[0] == '/' || (path.length() >= 2 && path[1] == ':')) {
-                dir = std::move(path);
-            }
-            else {
-                dir = fs::absolute(path).string();
-            }
-        }
 
 // =========================== epoll_server 
 
