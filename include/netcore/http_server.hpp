@@ -22,6 +22,7 @@ using send_ok_handler     = std::function<void()>;
 using send_failed_handler = std::function<void(const int&)>;
 using upload_check_handler= std::function<bool(request& req, response& res)>;
 
+template<typename Http_Server>
 class Server {
     friend http_server;
     private:
@@ -30,17 +31,19 @@ class Server {
         Acceptor m_acceptor;
         std::string static_dir = "www";
         int m_id;
+        Http_Server * m_hsp;
 
 
     public:
         Server()  = delete;
-        Server(int id,Acceptor & acc)
-            :m_id(id)
+        Server(Http_Server * hsp,int id,Acceptor & acc)
+            :m_hsp{hsp}, m_id(id)
         {
             m_acceptor.reset_io_context(m_ctx, acc);
         }
-        Server(int id,NativeHandle epollfd,Acceptor & acc)
-            :m_id(id),m_ctx(epollfd)
+
+        Server(Http_Server * hsp,int id,NativeHandle epollfd,Acceptor & acc)
+            :m_hsp{hsp}, m_id(id),m_ctx(epollfd)
         {
             m_acceptor.reset_io_context(m_ctx, acc);
         }
@@ -83,16 +86,7 @@ class Server {
                 try {
                     bool break_for_flag = false;
 
-                    auto conn_handle = std::make_shared<connection>(
-                            3*1024*1024, //max_req_size 3MB
-                            10*60, // keep_alive_timeout
-                            nullptr,      //http_handler  的函数指针
-                            nullptr, // http_handler_check 的函数指针
-                            nullptr,// ws_connection_check * ws_conn_check,
-                            static_dir,    //静态资源目录
-                            nullptr,//upload_check_handler * upload_check //上传查询
-                            conn->socket()
-                            );
+                    auto conn_handle = m_hsp->make_connection(conn->socket());
 
                     do  {
 
@@ -146,9 +140,10 @@ class Server {
 
 class http_server {
 
+    using Server_type = Server<http_server>;
 private:
     std::size_t m_num; //线程的数量
-    std::vector<Server> m_servers;
+    std::vector<Server_type> m_servers;
     unsigned int m_port;
     Acceptor m_acceptor;
 
@@ -189,7 +184,7 @@ public:
         //::accept(int __fd, struct sockaddr *__restrict __addr, socklen_t *__restrict __addr_len)
         m_servers.reserve(num);
         for(int i=0;i<num;++i){
-            m_servers.emplace_back(i,m_acceptor);
+            m_servers.emplace_back(this,i,m_acceptor);
         }
     }
 
@@ -207,6 +202,19 @@ public:
     }
 
 //================ 基础的方法
+//
+    auto make_connection(NativeSocket socket) {
+        return  std::make_shared<connection>(
+                3*1024*1024, //max_req_size 3MB
+                10*60, // keep_alive_timeout
+                &http_handler_,      //http_handler  的函数指针
+                &http_handler_check_, // http_handler_check 的函数指针
+                &ws_connection_check_ ,// ws_connection_check * ws_conn_check,
+                static_dir_,    //静态资源目录
+                &upload_check_,//upload_check_handler * upload_check //上传查询
+                socket
+                );
+    }
 
     /**
      * @desc 注册 websocket 连接检查函数
