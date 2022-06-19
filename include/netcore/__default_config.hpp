@@ -36,7 +36,7 @@ struct __config__{
     static constexpr int threadNum       = 4;
 
     //其它配置
-    static constexpr std::size_t maxRequestSize = 20_MB;
+    static constexpr std::size_t maxRequestSize = 3_MB;
     static constexpr std::size_t staticResCacheMaxAge = 0;
 
     //下载类型

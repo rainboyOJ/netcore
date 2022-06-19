@@ -5,6 +5,7 @@
 #pragma once
 #include "basic.hpp"
 #include "define.h"
+#include "logWrapper.hpp"
 
 namespace netcore {
 
@@ -306,6 +307,7 @@ public:
                 LOG(INFO) << "event fd:[" <<  evt.data.fd << "],events: " << ioe2str(evt);
                 auto callback = (Callback *)evt.data.ptr;
                 //log("invoke callback");
+                LOG(INFO) << "invoke callback";
                 callback->callback(evt);
                 //if (callback >= CallbackGuard)
                 //{
@@ -770,7 +772,7 @@ public:
 
     public:
         IoContext * m_ctx{nullptr};
-        using CONN_PTR = std::unique_ptr<RawConnection>;
+        using CONN_PTR = std::shared_ptr<RawConnection>;
         
         bool m_send_at_awaiter = false; // 是否需要在awaiter 里写
         bool m_recv_at_awaiter = false; // 是否需要在awaiter 里写
@@ -796,7 +798,7 @@ public:
         }
 
         ~RawConnection() {
-            LOG(INFO) << ("Connection deconsructor");
+            LOG(INFO) << __PRETTY_FUNCTION__;
             close();
             if( m_except != nullptr) {
                 std::rethrow_exception(m_except);
@@ -945,7 +947,7 @@ public:
         //TINYASYNC_ASSERT(conn_sock != NULL_SOCKET);
         //return { *acceptor->m_ctx, conn_sock, false };
         //return { acceptor->m_ctx, conn_sock};
-        return  std::make_unique<RawConnection>(acceptor->m_ctx,conn_sock);
+        return  std::make_shared<RawConnection>(acceptor->m_ctx,conn_sock);
     }
 };
     
@@ -966,14 +968,16 @@ struct Acceptor {
                 if (node) {
                     // it's ready to accept
                     struct sockaddr client_addr;
-                    socklen_t addrlen;
+                    socklen_t addrlen = sizeof(client_addr);
                     auto conn_sock = ::accept(acceptor->m_socket, &client_addr, &addrlen);
                     if (conn_sock == -1) {
+                        LOG(DEBUG) << "accept error " << errno ;
                         if(errno == EAGAIN || errno == EWOULDBLOCK) {
                             return;                    
                         } else {
                             //real error
                             // wakeup awaiter
+                            LOG(ERROR) << "accept error : " ;
                         }
                     }
 
@@ -1002,7 +1006,7 @@ struct Acceptor {
         IoContext * m_ctx;
         Protocol     m_protocol;
         Endpoint     m_endpoint;
-        NativeSocket m_socket;
+        NativeSocket m_socket{-1};
         bool m_added_to_event_pool;
 
         __AcceptorCallback m_callback = this;
@@ -1031,6 +1035,10 @@ struct Acceptor {
         {
             init(nullptr,protocol,endpoint);
         }
+        ~Acceptor() {
+            if( m_socket !=-1)
+                ::close(m_socket);
+        }
 
         //初始化构造
         void init(IoContext *, Protocol const& protocol, Endpoint const& endpoint) 
@@ -1038,7 +1046,7 @@ struct Acceptor {
             try {
                 //open(protocol); // 创建一个socket 给 m_socket
 
-                m_socket = open_socket(protocol);
+                m_socket = open_socket(protocol,true);
                 //
                 //
                 struct linger optLinger = { 0 };

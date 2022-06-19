@@ -43,6 +43,7 @@ namespace netcore {
     {
     public:
         explicit connection(
+                RawConnection::CONN_PTR raw_conn,
                 std::size_t max_req_size,
                 long keep_alive_timeout,
                 http_handler* handler,      //http_handler  的函数指针
@@ -52,7 +53,7 @@ namespace netcore {
                 upload_check_handler * upload_check, //上传查询
                 NativeSocket fd_
             )
-            :
+            : conn(raw_conn),
             MAX_REQ_SIZE_(max_req_size), KEEP_ALIVE_TIMEOUT_(keep_alive_timeout),
             http_handler_(handler), http_handler_check_(handler_check),
             ws_connection_check_(ws_conn_check),
@@ -62,6 +63,10 @@ namespace netcore {
             init_multipart_parser(); //初始化 multipart 解析器
         }
 
+
+        auto & get_raw_conn() {
+            return conn;
+        }
 
         int GetFd() const { return fd_;}
 
@@ -210,12 +215,14 @@ namespace netcore {
         }
 
         ~connection() {
+            LOG(INFO) << __PRETTY_FUNCTION__;
             Close();
         }
 
     private:
         void reset() {
             last_transfer_ = 0;
+            conn = nullptr;
             req_.reset();
             res_.reset();
         }
@@ -252,6 +259,7 @@ namespace netcore {
                 LOG(DEBUG) << "peek_route Failed" ;
                 //TODO 404
                 //response_back(status_type::404notfoudn); // 改写res为404响应
+                res_.set_status_and_content(status_type::not_found, "404");
                 return process_state::need_write;
             }
 
@@ -268,6 +276,7 @@ namespace netcore {
         // 处理和各种类型的body
         // 如果没有 body 直接 处理头
         process_state handle_request(std::size_t bytes_transferred) { //处理请求
+            LOG(DEBUG) << __FUNCTION__;
             if (req_.has_body()) {
                 // TODO check call back is having this route
                 // {
@@ -408,6 +417,7 @@ namespace netcore {
         //-------------form urlencoded----------------//
 
         void call_back() {
+            LOG(DEBUG) << __FUNCTION__;
             assert(http_handler_);
             (*http_handler_)(req_, res_);
         }
@@ -603,6 +613,7 @@ namespace netcore {
 
         //处理 只有 headers 的情况
         process_state handle_header_request() {
+            LOG(DEBUG) << __FUNCTION__;
             if (is_upgrade_) { //websocket
                 //TODO 增加一个检查是否可以进行websock连接的函数
                 // 注意!! 这里使用了 route的_ap
@@ -1108,6 +1119,9 @@ public:
         std::atomic_bool has_closed_ = false;
 
         NativeSocket fd_{-1};
+
+        RawConnection::CONN_PTR conn = nullptr;
+
 };
 
     inline constexpr data_proc_state ws_open    = data_proc_state::data_begin;

@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include <thread>
+#include "logWrapper.hpp"
 #include "core.hpp"
 #include "connection.hpp"
 #include "http_router.hpp"
@@ -12,6 +13,7 @@
 #include "hs_utils.hpp"
 
 namespace netcore {
+
 
 class http_server;
 
@@ -54,85 +56,99 @@ class Server {
         Task listen() //启动
         {
             for(;;) {
-                log("async_accept at thread : ",m_id);
+                LOG(INFO) << "async_accept at thread : " << m_id;
                 auto conn = co_await m_acceptor.async_accept();
-                co_spawn(handle(std::move(conn)));
+                auto conn_sp = m_hsp->make_connection(std::move(conn));
+                co_spawn(handle(conn_sp));
             }
         }
         //运行
         void Serve(){
             m_thread = std::thread([this]{
                     try {
-                    log("$Server start id : $",m_id);
-                    co_spawn(listen());
-                    log("Server run at server id : ",m_id);
-                    m_ctx.run();
+                        LOG(INFO) << "Server start id : " <<m_id;
+                        co_spawn(listen());
+                        LOG(INFO) << "Server run at server id : " << m_id;
+                        m_ctx.run();
                     }
                     catch(const std::exception &e){
-                    //log(std::current_exception());
-                    log("catch, error 1");
-                    log(e.what());
+                        //LOG(std::current_exception());
+                        LOG(INFO) << "catch, error 1";
+                        LOG(ERROR) << e.what();
                     }
-                    //catch(...){
-                    //log("catch, error 2");
-                    //}
-                    });
+                    catch(...){
+                        LOG(INFO) << "catch, error 2";
+                    }
+                    m_hsp->stop_thread.store(true);
+                });
         }
 
         //处理发生connection
-        Task handle(RawConnection::CONN_PTR conn) 
+        Task handle(std::shared_ptr<connection> conn_handle) 
         {
-            for(;;) {
                 try {
                     bool break_for_flag = false;
 
-                    auto conn_handle = m_hsp->make_connection(conn->socket());
+                    //auto conn_handle = m_hsp->make_connection(conn->socket());
 
                     do  {
 
-                        auto nbtyes = co_await conn->async_read(conn_handle->req().buffer(),conn_handle->req().left_size(),100s);
+                        auto nbytes = co_await conn_handle->get_raw_conn()->async_read(conn_handle->req().buffer(),conn_handle->req().left_size(),100s);
                         // 进行相应的处理
-                        if( nbtyes == 0){
+                        if( nbytes == 0){
                             break_for_flag = true;
                             break ;
                         }
+                        if( conn_handle->req().update_size(nbytes)) {
+                            LOG(DEBUG) << "overflow MaxSize";
+                            conn_handle->res().set_status_and_content(status_type::bad_request,"overflow MaxSize 3M");
+                            break_for_flag = true;
+                            break ;
+                        }
+                        LOG(DEBUG) << "async_read bytes size : " << nbytes;
+                        // 读取的数据
+                        //for(int i = 0 ;i <  conn_handle->req().current_size() ; i++) {
+                        //    std::cout << conn_handle->req().data()[i] ;
+                        //}
+                        //std::cout  << std::endl;
 
                         auto pc_state = conn_handle->process();
                         if( pc_state == process_state::need_read)
                             continue;
                     } while(0);
 
-                    if( break_for_flag ) break;
+                    if( break_for_flag ) co_return;
 
+                    LOG(DEBUG) << "---process read end ,need to write";
 
-                    auto send_bufs = conn_handle->res().to_buffers();
-                    for (auto& e : send_bufs) {
-                        auto nbtyes = co_await conn->async_send(e.data(),e.length(),100s);
-                        if( nbtyes == 0){
-                            log("======> send nbytes 0");
-                            break;
-                        }
-                    }
+                    //auto send_bufs = conn_handle->res().to_buffers();
+                    auto & rep_str = conn_handle->res().response_str();
+                    auto nbytes = co_await conn_handle->get_raw_conn()->async_send(rep_str.data(),rep_str.length(),100s);
 
-
+                    //for (auto& e : send_bufs) {
+                        //LOG(DEBUG) << "async send";
+                        //LOG(DEBUG) << e;
+                        //auto nbytes = co_await conn->async_send(e.data(),e.length(),100s);
+                        //if( nbytes == 0){
+                            ////LOG("======> send nbytes 0");
+                            //break;
+                        //}
+                    //}
+                    LOG(DEBUG) << "async _send end";
                 }
                 catch(const netcore::SendError& e){
-                    log(e.what());
-                    conn->clear_except();
-                    break;
+                    LOG(INFO) << e.what();
+                    conn_handle->get_raw_conn()->clear_except();
                 }
                 catch(const netcore::RecvError& e){
-                    log(e.what());
-                    conn->clear_except();
-                    break;
+                    LOG(INFO) << e.what();
+                    conn_handle->get_raw_conn()->clear_except();
                 }
                 catch(const netcore::IoTimeOut& e){
-                    log(e.what());
-                    conn->clear_except();
-                    break;
+                    LOG(INFO) << e.what();
+                    conn_handle->get_raw_conn()->clear_except();
                 }
 
-            } // end for(;;)
         }
 };
     
@@ -147,8 +163,12 @@ private:
     unsigned int m_port;
     Acceptor m_acceptor;
 
+public:
+
+    std::atomic_bool stop_thread = false;
 
 private:
+
 
     std::string static_dir_ = fs::absolute(__config__::static_dir).string(); //default
     std::string upload_dir_ = fs::absolute(__config__::upload_dir).string(); //default
@@ -181,6 +201,7 @@ public:
         :m_port(port),m_num(num),
         m_acceptor(Protocol::ip_v4(),Endpoint(Address::Any(),port))
     {
+        init_conn_callback();
         //::accept(int __fd, struct sockaddr *__restrict __addr, socklen_t *__restrict __addr_len)
         m_servers.reserve(num);
         for(int i=0;i<num;++i){
@@ -203,8 +224,9 @@ public:
 
 //================ 基础的方法
 //
-    auto make_connection(NativeSocket socket) {
+    auto make_connection(RawConnection::CONN_PTR conn) {
         return  std::make_shared<connection>(
+                conn,
                 3*1024*1024, //max_req_size 3MB
                 10*60, // keep_alive_timeout
                 &http_handler_,      //http_handler  的函数指针
@@ -212,7 +234,7 @@ public:
                 &ws_connection_check_ ,// ws_connection_check * ws_conn_check,
                 static_dir_,    //静态资源目录
                 &upload_check_,//upload_check_handler * upload_check //上传查询
-                socket
+                conn->socket()
                 );
     }
 
@@ -246,6 +268,7 @@ public:
         void init_conn_callback() {
             set_static_res_handler();
             http_handler_check_ = [this](request& req, response& res,bool route_it=false) { //这里初始化了 http_handler_
+                LOG(DEBUG) << __PRETTY_FUNCTION__ ;
                 try {
                     bool success = http_router_.route(req.get_method(), req.get_url(), req, res,route_it); //调用route
                     if (!success) {
