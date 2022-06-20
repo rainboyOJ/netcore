@@ -121,7 +121,7 @@ namespace netcore {
         //void send_ws_string(std::string msg, Fs&&... fs) {
             //send_ws_msg(std::move(msg), opcode::text, std::forward<Fs>(fs)...);
         //}
-        bool is_ws_socket() const {
+        inline bool is_ws_socket() const {
             return is_upgrade_;
         }
         template<typename... Fs>
@@ -614,7 +614,8 @@ namespace netcore {
         //处理 只有 headers 的情况
         process_state handle_header_request() {
             LOG(DEBUG) << __FUNCTION__;
-            if (is_upgrade_) { //websocket
+            if (is_ws_socket()) { //websocket
+                LOG(DEBUG) << "__is_ws_socket__";
                 //TODO 增加一个检查是否可以进行websock连接的函数
                 // 注意!! 这里使用了 route的_ap
                 // 1. 是否有 before ap ,没有不可以ws
@@ -631,6 +632,7 @@ namespace netcore {
                 //timer_.cancel();
                 ws_.upgrade_to_websocket(req_, res_);   //生成 res_里的返回内容
                 response_handshake();           //写内容
+                LOG(DEBUG) << "response_handshake end,need_read read";
                 return process_state::need_read;
             }
 
@@ -658,20 +660,22 @@ namespace netcore {
         //@desc 返回握手信息,其实就是直接写数据
         void response_handshake()
         {
-            std::vector<std::string> buffers = res_.to_buffers();
+            LOG(INFO) << __PRETTY_FUNCTION__;
+            //std::vector<std::string> buffers = res_.to_buffers();
+            res_.build_response_str();
             //LOG_DEBUG("response_handshake : %d",buffers.empty());
             std::string buf_to_send;
-            if (buffers.empty()) {
+            if (res_.response_str().empty()) {
                 Close(); // TODO 这里要改 我们不主动的关闭自己
                 return;
             }
             // 直接写
-            for (auto& e : buffers) {
-                //LOG_DEBUG("%s,%d",e.c_str(),e.length());
-                buf_to_send.append(std::move(e));
-            }
+            //for (auto& e : buffers) {
+                ////LOG_DEBUG("%s,%d",e.c_str(),e.length());
+                //buf_to_send.append(std::move(e));
+            //}
             //LOG_DEBUG("%s",buf_to_send.c_str());
-            direct_write(buf_to_send.c_str(), buf_to_send.length());
+            direct_write(res_.response_str().c_str(), res_.response_str().length());
             //set_continue_workd
             //continue_work_ = &connection::ws_response_handshake_continue_work;
 
@@ -832,6 +836,7 @@ namespace netcore {
 
         bool handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred)
         {
+            LOG(INFO) <<  __PRETTY_FUNCTION__;
             switch (ret)
             {
                 case netcore::ws_frame_type::WS_ERROR_FRAME:

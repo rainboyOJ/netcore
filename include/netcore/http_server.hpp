@@ -115,7 +115,7 @@ class Server {
                         auto pc_state = conn_handle->process();
                         if( pc_state == process_state::need_read)
                             continue;
-                    } while(0);
+                    } while(1);
 
                     if( break_for_flag ) co_return;
 

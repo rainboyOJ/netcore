@@ -81,6 +81,7 @@ namespace netcore {
 
         //建立响应的 字符串
         void build_response_str() {
+            rep_str_.clear();
             rep_str_.append(to_rep_string(status_));
 
             //if (keep_alive_) {
