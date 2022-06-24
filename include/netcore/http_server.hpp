@@ -232,7 +232,7 @@ public:
                 &http_handler_check_, // http_handler_check 的函数指针
                 &ws_connection_check_ ,// ws_connection_check * ws_conn_check,
                 static_dir_,    //静态资源目录
-                &upload_check_,//upload_check_handler * upload_check //上传查询
+                upload_check_ ?  &upload_check_ : nullptr,//upload_check_handler * upload_check //上传查询
                 conn->socket()
                 );
     }

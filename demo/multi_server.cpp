@@ -63,6 +63,13 @@ int main(){
             res.set_status_and_content(status_type::ok, std::to_string(value));
     });
     // 表单上传
+    hs.set_http_handler<POST>("/multipart",[](request & req,response & res){
+            std::cout << "/multipart, the query is" << std::endl;
+            //int value = req.get_query_value<int>("value");
+            auto value = req.get_multipart_value_by_key("value");
+            std::cout << "value : " << value << std::endl;
+            res.set_status_and_content(status_type::ok, std::move(value));
+    });
     // 文件上传
     // 文件下载
 
