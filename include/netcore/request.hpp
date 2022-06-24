@@ -67,7 +67,8 @@ namespace netcore {
                 return nullptr;
 
             if (auto base_conn = conn_.lock(); base_conn != nullptr) {
-                return std::static_pointer_cast<connection>(base_conn);
+                //return std::static_pointer_cast<connection>(base_conn);
+                return base_conn;
             }
             else {
                 return nullptr;

@@ -8,7 +8,6 @@
 - [qinguoyi/TinyWebServer: Linux下C++轻量级Web服务器](https://github.com/qinguoyi/TinyWebServer)
 - [markparticle/WebServer: C++ Linux WebServer服务器](https://github.com/markparticle/WebServer)
 - [zhangwenxiao/Cpp11WebServer: A High Performance HTTP Web Server in C++11](https://github.com/zhangwenxiao/Cpp11WebServer)
-
 ## 使用自己的配置文件
 
 拷贝`netcore/__default_config.hpp`到自己项目目录,修改对应的值
@@ -83,12 +82,11 @@ timer.hpp not use
 
 ## 功能
 
-- [ ] connect 抽象
 - [ ] 连接超时检测
+- [ ] 表单提交
 - [ ] 文件上传
     - [ ] 尺寸限制
     - [ ] multipart
 - [ ] 文件下载
-- [ ] 路由
-- [ ] websocket
+- [ ] websocket(被动响应式)
 - [ ] 简易Cache

@@ -33,6 +33,10 @@ namespace netcore {
             return rep_str_;
         }
 
+        void set_response(std::string && str) {
+            rep_str_ = std::move(str);
+        }
+
         //开启时间
         void enable_response_time(bool enable) {
             need_response_time_ = enable;

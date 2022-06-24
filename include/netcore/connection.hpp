@@ -35,7 +35,7 @@ namespace netcore {
     enum class process_state {
         need_read,
         need_write,
-        need_ws
+        need_write_then_read // for_ws
     };
 
     using SocketType = int;
@@ -759,81 +759,25 @@ namespace netcore {
                 //进行处理
                 //根据结果
                 if (!handle_ws_frame(wsft, std::move(payload), 0))
+                    //return process_state::need_write_then_read;
                     return process_state::need_write;
 
             } while ( ws_.is_fin() == false );
 
             req_.set_current_size(0);
             //LOG_DEBUG("after set current_size ,%d",req_.get_cur_size_());
-            return process_state::need_read;
+            //return process_state::need_read;
+            return  process_state::need_write_then_read;
         }
 
-        process_state do_read_websocket_head()
-        {
-            size_t length = req_.current_size(); //TODO 读取的长度 ?
-            int ret = ws_.parse_header(req_.buffer(), length); //解析头
-            //req_.set_current_size(0);
-
-            if (ret == parse_status::complete) { //完成了
-                //read payload
-                auto payload_length = ws_.payload_length();
-                req_.set_body_len(payload_length);
-                if (req_.at_capacity(payload_length)) { //超过最大容量
-                    req_.call_event(data_proc_state::data_error);
-                    Close(); //结束 TODO 应该在哪里结束?
-                    return process_state::need_write;
-                }
-                req_.set_current_size(0); // 测试完了一个frame 不应该清零
-                req_.fit_size(); // TODO fit size有什么作用
-                continue_work_ = &connection::do_read_websocket_data; 
-            }
-            else if (ret == parse_status::not_complete) {
-                //req_.set_current_size(bytes_transferred); // ?
-                return process_state::need_read;
-                //do_read_websocket_head(ws_.left_header_len());
-            }
-            else { //发生错误
-                req_.call_event(data_proc_state::data_error);
-                Close(); //结束 TODO 应该在哪里结束?
-            }
-            return process_state::need_read;
-        }
 
         //TODO
         bool ws_response_handshake_continue_work();
 
-        process_state do_read_websocket_data() 
-        {
 
-            auto bytes_transferred = 1;
-            if (req_.body_finished()) {
-                req_.set_current_size(0);
-                bytes_transferred = ws_.payload_length(); // TODO 长度应该如何设定?
-            }
-
-            std::string payload;
-            ws_frame_type ret = ws_.parse_payload(req_.buffer(), bytes_transferred, payload); //解析payload
-            if (ret == ws_frame_type::WS_INCOMPLETE_FRAME) { // 末完成的frame
-                req_.update_size(bytes_transferred);
-                req_.reduce_left_body_size(bytes_transferred);;
-                continue_work_ = &connection::do_read_websocket_data;
-                return process_state::need_read;
-            }
-
-            if (ret == ws_frame_type::WS_INCOMPLETE_TEXT_FRAME || ret == ws_frame_type::WS_INCOMPLETE_BINARY_FRAME) {
-                last_ws_str_.append(std::move(payload));
-            }
-
-            //进行处理
-            //根据结果
-            if (!handle_ws_frame(ret, std::move(payload), bytes_transferred))
-                return process_state::need_write;
-
-            req_.set_current_size(0);
-            continue_work_ =  &connection::do_read_websocket_head;
-            return process_state::need_read;
-        }
-
+        // 返回值
+        //  true 正常处理完毕
+        //  false 运行失败需要结束
         bool handle_ws_frame(ws_frame_type ret, std::string&& payload, size_t bytes_transferred)
         {
             LOG(INFO) <<  __PRETTY_FUNCTION__;
@@ -870,16 +814,15 @@ namespace netcore {
 
                         std::string close_msg = ws_.format_close_payload(opcode::close, close_frame.message, len);
                         auto header = ws_.format_header(close_msg.length(), opcode::close);
-                        WS_manager::get_instance().send_ws_string(GetFd(), header+close_msg,true);
+                        //WS_manager::get_instance().send_ws_string(GetFd(), header+close_msg,true);
+                        res_.set_response(header+close_msg);
                         return false;
-                        //send_msg(std::move(header), std::move(close_msg),true); //发送
                     }
                     break;
                 case netcore::ws_frame_type::WS_PING_FRAME:
                     {
                         auto header = ws_.format_header(payload.length(), opcode::pong);
-                        //send_msg(std::move(header), std::move(payload));
-                        WS_manager::get_instance().send_ws_string(GetFd(), header+payload);
+                        res_.set_response(header+payload);
                     }
                     break;
                 case netcore::ws_frame_type::WS_PONG_FRAME:
@@ -1072,11 +1015,19 @@ public:
             return m_file_tag;
         }
 
+        void build_ws_string(const char *src ,std::size_t length_){
+            //auto t = websocket::format_message(src,length_, opcode::text);
+            //res_.response_str() = std::string("hello");
+            res_.set_response("hello");
+        }
+
     private:
         // 这里本应该是读取与写入
         // 但是为了代码的简单
         // 把读取与写入放到了connection的外部
         // connection 只进行数据的处理
+
+
 
     private:
         /*---------- member ----------*/

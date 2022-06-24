@@ -86,12 +86,15 @@ class Server {
         //处理发生connection
         Task handle(std::shared_ptr<connection> conn_handle) 
         {
-                try {
+            try {
+                bool for_1_end = false;
+                for(; !for_1_end ;) { //无限循环,直接 need_write
+
                     bool break_for_flag = false;
 
                     //auto conn_handle = m_hsp->make_connection(conn->socket());
 
-                    do  {
+                    for(;;){
 
                         auto nbytes = co_await conn_handle->get_raw_conn()->async_read(conn_handle->req().buffer(),conn_handle->req().left_size(),100s);
                         // 进行相应的处理
@@ -113,41 +116,37 @@ class Server {
                         //std::cout  << std::endl;
 
                         auto pc_state = conn_handle->process();
+                        for_1_end = pc_state == process_state::need_write;
                         if( pc_state == process_state::need_read)
                             continue;
-                    } while(1);
+                        else break;
+                    };
 
-                    if( break_for_flag ) co_return;
+                    if( break_for_flag ) co_return; // 直接退出
 
                     LOG(DEBUG) << "---process read end ,need to write";
 
                     //auto send_bufs = conn_handle->res().to_buffers();
                     auto & rep_str = conn_handle->res().response_str();
+                    // 这里改成一次不发送完整,而是按128K一次的发送
                     auto nbytes = co_await conn_handle->get_raw_conn()->async_send(rep_str.data(),rep_str.length(),100s);
 
-                    //for (auto& e : send_bufs) {
-                        //LOG(DEBUG) << "async send";
-                        //LOG(DEBUG) << e;
-                        //auto nbytes = co_await conn->async_send(e.data(),e.length(),100s);
-                        //if( nbytes == 0){
-                            ////LOG("======> send nbytes 0");
-                            //break;
-                        //}
-                    //}
                     LOG(DEBUG) << "async _send end";
+
                 }
-                catch(const netcore::SendError& e){
-                    LOG(INFO) << e.what();
-                    conn_handle->get_raw_conn()->clear_except();
-                }
-                catch(const netcore::RecvError& e){
-                    LOG(INFO) << e.what();
-                    conn_handle->get_raw_conn()->clear_except();
-                }
-                catch(const netcore::IoTimeOut& e){
-                    LOG(INFO) << e.what();
-                    conn_handle->get_raw_conn()->clear_except();
-                }
+            }
+            catch(const netcore::SendError& e){
+                LOG(INFO) << e.what();
+                conn_handle->get_raw_conn()->clear_except();
+            }
+            catch(const netcore::RecvError& e){
+                LOG(INFO) << e.what();
+                conn_handle->get_raw_conn()->clear_except();
+            }
+            catch(const netcore::IoTimeOut& e){
+                LOG(INFO) << e.what();
+                conn_handle->get_raw_conn()->clear_except();
+            }
 
         }
 };
