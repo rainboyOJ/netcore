@@ -89,5 +89,6 @@ timer.hpp not use
     - [ ] 尺寸限制
     - [ ] multipart
 - [x] 文件下载
+  - [ ] 使用write_ranges
 - [x] websocket(被动响应式)
 - [x] 简易Cache

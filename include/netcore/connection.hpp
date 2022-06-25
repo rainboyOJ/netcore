@@ -222,7 +222,7 @@ namespace netcore {
     private:
         void reset() {
             last_transfer_ = 0;
-            conn = nullptr;
+            //conn = nullptr;
             req_.reset();
             res_.reset();
         }
@@ -966,16 +966,16 @@ namespace netcore {
         //-----------------send message----------------//
 public:
         //-----------------HttpConn function----------------//
-        void init(int fd, const sockaddr_in& addr) {
+        void init() {
             if ( !has_continue_workd() ){ //新的
                 req_.set_conn(this->shared_from_this()); // ?
                 //userCount++;
                 //addr_ = addr;
-                fd_ = fd;
+                //fd_ = fd;
                 //writeBuff_.RetrieveAll();
                 //readBuff_.RetrieveAll();
                 has_closed_ = false;
-                reset(); // 每一次都必须是一次完整的http请求
+                //reset(); // 每一次都必须是一次完整的http请求
             }
             //LOG_INFO("Client[%d](%s:%d) in, userCount:%d", fd_, GetIP(), GetPort(), (int)userCount);
         }

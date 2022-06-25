@@ -224,7 +224,7 @@ public:
 //================ 基础的方法
 //
     auto make_connection(RawConnection::CONN_PTR conn) {
-        return  std::make_shared<connection>(
+        auto conn_shr = std::make_shared<connection>(
                 conn,
                 3*1024*1024, //max_req_size 3MB
                 10*60, // keep_alive_timeout
@@ -235,6 +235,8 @@ public:
                 upload_check_ ?  &upload_check_ : nullptr,//upload_check_handler * upload_check //上传查询
                 conn->socket()
                 );
+        conn_shr->init(); //TODO 应该传入addr
+        return conn_shr;
     }
 
     /**
