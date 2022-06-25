@@ -84,10 +84,10 @@ timer.hpp not use
 
 - [x] 连接超时检测
 - [x] url_query
-- [ ] 表单提交
+- [x] 表单提交 - multipart
 - [ ] 文件上传
     - [ ] 尺寸限制
     - [ ] multipart
-- [ ] 文件下载
-- [ ] websocket(被动响应式)
-- [ ] 简易Cache
+- [x] 文件下载
+- [x] websocket(被动响应式)
+- [x] 简易Cache

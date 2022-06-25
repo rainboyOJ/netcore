@@ -947,7 +947,7 @@ public:
         //TINYASYNC_ASSERT(conn_sock != NULL_SOCKET);
         //return { *acceptor->m_ctx, conn_sock, false };
         //return { acceptor->m_ctx, conn_sock};
-        return  std::make_shared<RawConnection>(acceptor->m_ctx,conn_sock);
+        return  std::make_shared<RawConnection>(acceptor->m_ctx,conn_sock,m_u32_clien_addr);
     }
 };
     
