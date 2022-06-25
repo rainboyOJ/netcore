@@ -140,7 +140,10 @@ public:
     bool exists(Key_t&& key);
 
     //@desc 删除一个key
-    std::size_t del(Key_t&& key);
+    std::size_t del(const Key_t& key);
+
+    //@desc 设定新的过期时间
+    void new_expire(const Key_t& key,std::size_t expiration = 10);
 
     //@desc 得到一个key的值
     std::tuple<bool, Val_t > get(const Key_t& key); 
@@ -209,12 +212,26 @@ bool
 template<typename Key_t,typename Val_t ,std::size_t Shard_size>
 std::size_t
     Fastcache<Key_t,Val_t,Shard_size>::
-    del(Key_t&& key)
+    del(const Key_t& key)
 {
     std::size_t index = calc_index(std::forward<Key_t>(key));
     auto & _shard = m_shards[index];
     std::lock_guard<std::mutex> lck(_shard.mtx);
     return _shard._container.erase(key);
+}
+
+template<typename Key_t,typename Val_t ,std::size_t Shard_size>
+void
+    Fastcache<Key_t,Val_t,Shard_size>::
+    new_expire(const Key_t& key,std::size_t expiration )
+{
+    std::size_t index = calc_index(std::forward<Key_t>(key));
+    auto & _shard = m_shards[index];
+    std::lock_guard<std::mutex> lck(_shard.mtx);
+    auto it = _shard._container.find(key);
+    if( it != _shard._container.end()){
+        it->second.expiration = getNowSeconds() + expiration;
+    }
 }
 
 template<typename Key_t,typename Val_t ,std::size_t Shard_size>
@@ -301,7 +318,8 @@ private:
 };
 
 
-} // end namespace netcore
+} // end namespace rojcpp
+
 
 
 
