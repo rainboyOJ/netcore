@@ -214,7 +214,7 @@ std::size_t
     Fastcache<Key_t,Val_t,Shard_size>::
     del(const Key_t& key)
 {
-    std::size_t index = calc_index(std::forward<Key_t>(key));
+    std::size_t index = calc_index(key);
     auto & _shard = m_shards[index];
     std::lock_guard<std::mutex> lck(_shard.mtx);
     return _shard._container.erase(key);
@@ -225,7 +225,7 @@ void
     Fastcache<Key_t,Val_t,Shard_size>::
     new_expire(const Key_t& key,std::size_t expiration )
 {
-    std::size_t index = calc_index(std::forward<Key_t>(key));
+    std::size_t index = calc_index(key);
     auto & _shard = m_shards[index];
     std::lock_guard<std::mutex> lck(_shard.mtx);
     auto it = _shard._container.find(key);
