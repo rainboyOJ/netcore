@@ -108,8 +108,10 @@ class Fastcache {
         void del_expired_keys(std::size_t now_time = getNowSeconds() ) {
             std::lock_guard<std::mutex> _lock(mtx);
             for( auto it = _container.begin() ; it != _container.end();) {
-                if( it->second.expired(now_time) )
+                if( it->second.expired(now_time) ){
+                    //std::cout << "del expired key : " << it->second.data << std::endl;
                     it = _container.erase(it);
+                }
                 else
                     ++it;
             }
@@ -149,8 +151,7 @@ public:
     std::tuple<bool, Val_t > get(const Key_t& key); 
 
     //@desc 追加
-    template<typename K,typename V>
-    void append(K&& key,V&& _data,std::size_t expiration = 10);
+    void append(const Key_t & key,const Val_t & _data,std::size_t expiration = 10);
 
 protected:
     //desc 检查每一个shard里过期的key
@@ -243,7 +244,7 @@ std::tuple<bool, Val_t >
     auto & _shard = m_shards[index];
     std::lock_guard<std::mutex> lck(_shard.mtx);
     try {
-        auto val = _shard._container.at(key);
+        auto &val = _shard._container.at(key);
         //std::cout << val.data << " : expired at : " << val.expiration  << std::endl;
         //std::cout << "now :" << getNowSeconds() << std::endl;
         if( val.expired() ) {
@@ -253,6 +254,7 @@ std::tuple<bool, Val_t >
         return  std::make_tuple(true, val.data);
     }
     catch(std::exception & e){
+        //std::cout << e.what() << std::endl;
         return  std::make_tuple(false,Val_t{});
     }
 }
@@ -274,12 +276,12 @@ void
 }
 
 template<typename Key_t,typename Val_t ,std::size_t Shard_size>
-template<typename K,typename V>
 void
     Fastcache<Key_t,Val_t,Shard_size>::
-    append(K&& key,V&& val,std::size_t expiration)
+    append(const Key_t& key,const Val_t & val,std::size_t expiration)
 {
-    std::size_t index = calc_index(std::forward<Key_t>(key));
+    std::cout << "in append exists : " << exists(std::string(key)) << std::endl;
+    std::size_t index = calc_index(key);
     auto & _shard = m_shards[index];
     std::lock_guard<std::mutex> lck(_shard.mtx);
 
@@ -288,10 +290,10 @@ void
     if ( iter == _shard._container.end() ) 
     {
         _shard._container[key] 
-            = CacheItem(std::forward<Val_t>(val),expiration);
+            = CacheItem(val,expiration);
     }
     else { //找到了,追加
-        iter->second.append(val,expiration);
+        iter->second.append(val, getNowSeconds() + expiration);
     }
 }
 
