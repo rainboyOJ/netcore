@@ -916,6 +916,15 @@ namespace netcore {
             check_headers_ = std::move(check_headers);
         }
 
+        void set_user_id(unsigned long long id){
+            m_user_id = id;
+        }
+
+        unsigned long long get_user_id() const 
+        {
+            return m_user_id;
+        }
+
     //private: // TODO
     public:
         void resize_double() {
@@ -1016,6 +1025,9 @@ namespace netcore {
         std::int64_t static_resource_file_size_ = 0;
         std::vector<std::string> aspect_data_;
         std::array<event_call_back, (size_t)data_proc_state::data_error + 1> event_call_backs_ = {};
+
+        // 一个特别的值,设定这条连接对应的用户的id值(sql的记录id)
+        unsigned long long m_user_id = 0;
     };
 
 } // end of namespace netcore
