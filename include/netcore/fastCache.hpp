@@ -246,9 +246,11 @@ std::tuple<bool, Val_t >
         auto val = _shard._container.at(key);
         //std::cout << val.data << " : expired at : " << val.expiration  << std::endl;
         //std::cout << "now :" << getNowSeconds() << std::endl;
-        if( val.expired() )
+        if( val.expired() ) {
             _shard._container.erase(key);
-        return  std::make_tuple(true, std::move(val.data));
+            return std::make_tuple(false,Val_t{});
+        }
+        return  std::make_tuple(true, val.data);
     }
     catch(std::exception & e){
         return  std::make_tuple(false,Val_t{});
