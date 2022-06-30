@@ -295,7 +295,7 @@ public:
             // ===== 进行epoll event的检查
             const int maxevents = 5;
             epoll_event events[maxevents];
-            int const timeout = 0; // indefinitely
+            int const timeout = 10; // -1->indefinitely
 
             //TINYASYNC_LOG("waiting event ... handle = %s", handle_c_str(epfd));
             int nfds = epoll_wait(m_epoll_handle, (epoll_event *)events, maxevents, timeout);
