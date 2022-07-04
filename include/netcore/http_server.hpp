@@ -209,15 +209,15 @@ public:
     }
 
     ~http_server() {
-        for(int i=0;i<m_num;++i){
-            if(m_servers[i].m_thread.joinable())
-                m_servers[i].m_thread.join();
-        }
     }
     void run() //运行
     {
         for(int i=0;i<m_num;++i){
             m_servers[i].Serve();
+        }
+        for(int i=0;i<m_num;++i){
+            if(m_servers[i].m_thread.joinable())
+                m_servers[i].m_thread.join();
         }
     }
 
